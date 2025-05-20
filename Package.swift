@@ -11,13 +11,26 @@ let package = Package(
             targets: ["AsyncSwiftly"]
         ),
     ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.0.4"),
+    ],
     targets: [
         .target(
             name: "AsyncSwiftly"
         ),
+        .target(
+            name: "TestingSupport",
+            dependencies: [
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+            ],
+        ),
         .testTarget(
             name: "AsyncSwiftlyTests",
             dependencies: ["AsyncSwiftly"]
+        ),
+        .testTarget(
+            name: "TestingSupportTests",
+            dependencies: ["TestingSupport"]
         ),
     ]
 )
