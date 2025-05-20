@@ -19,6 +19,9 @@ let package = Package(
             name: "AsyncSwiftly"
         ),
         .target(
+            name: "AsyncMaterializedSequence"
+        ),
+        .target(
             name: "TestingSupport",
             dependencies: [
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
@@ -26,11 +29,22 @@ let package = Package(
         ),
         .testTarget(
             name: "AsyncSwiftlyTests",
-            dependencies: ["AsyncSwiftly"]
+            dependencies: [
+                "AsyncSwiftly",
+            ]
+        ),
+        .testTarget(
+            name: "AsyncMaterializedSequenceTests",
+            dependencies: [
+                "AsyncMaterializedSequence", 
+                "TestingSupport",
+            ]
         ),
         .testTarget(
             name: "TestingSupportTests",
-            dependencies: ["TestingSupport"]
+            dependencies: [
+                "TestingSupport",
+            ]
         ),
     ]
 )
