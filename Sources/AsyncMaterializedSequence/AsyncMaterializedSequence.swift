@@ -1,5 +1,3 @@
-import Foundation
-
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension AsyncSequence {
     
@@ -114,7 +112,7 @@ extension AsyncMaterializedSequence.Completion: CustomDebugStringConvertible {
     public var debugDescription: String {
         switch self {
         case .failure(let error):
-            ".failure(\(error.localizedDescription))"
+            ".failure(\(error))"
         case .finished:
             ".finished"
         }
