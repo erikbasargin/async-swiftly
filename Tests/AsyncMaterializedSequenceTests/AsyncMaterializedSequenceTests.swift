@@ -55,7 +55,7 @@ struct AsyncMaterializedSequenceTests {
         }
         
         let sequence = source.materialize()
-        let events = await sequence.collect()
+        let events = await sequence.collect() ?? []
         
         #expect(events.count == 1)
         

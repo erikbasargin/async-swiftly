@@ -17,7 +17,34 @@ struct AsyncSequenceCollectTests {
 
     @Test func collect_produces_empty_array_when_source_sequence_is_completed_without_elements() async throws {
         let stream = AsyncStream<Int> { $0.finish() }
-        await #expect(stream.collect().isEmpty == true)
+        await #expect(stream.collect()?.isEmpty == true)
+    }
+    
+    @Test func collect_produces_nil_when_source_sequence_is_cancelled() async throws {
+        let task = Task {
+            let stream = AsyncStream<Int> { _ in }
+            return await stream.collect()
+        }
+        
+        task.cancel()
+        
+        await #expect(task.value == nil)
+    }
+    
+    @Test func collect_produces_array_of_elements_when_source_sequence_is_cancelled_and_produced_some_elements() async throws {
+        let source = [1, 2, 3]
+        let task = Task {
+            let stream = AsyncStream<Int> {
+                for value in source {
+                    $0.yield(value)
+                }
+            }
+            return await stream.collect()
+        }
+        
+        task.cancel()
+        
+        await #expect(task.value == source)
     }
 
     @Test func collect_rethrows_error_when_source_sequence_is_failed() async throws {
