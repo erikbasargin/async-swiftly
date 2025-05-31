@@ -22,6 +22,12 @@ let package = Package(
             name: "AsyncMaterializedSequence"
         ),
         .target(
+            name: "AsyncTrigger",
+            dependencies: [
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+            ]
+        ),
+        .target(
             name: "TestingSupport",
             dependencies: [
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
@@ -37,6 +43,13 @@ let package = Package(
             name: "AsyncMaterializedSequenceTests",
             dependencies: [
                 "AsyncMaterializedSequence", 
+                "TestingSupport",
+            ]
+        ),
+        .testTarget(
+            name: "AsyncTriggerTests",
+            dependencies: [
+                "AsyncTrigger",
                 "TestingSupport",
             ]
         ),
