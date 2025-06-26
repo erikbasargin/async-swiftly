@@ -16,18 +16,34 @@ struct SchedulingTaskGroupTests {
         let (stream, continuation) = AsyncStream<Int>.makeStream()
         let operations = 0..<5
         
-        let group = SchedulingTaskGroup()
-        
-        for operation in operations {
-            group.addTask(at: 0) {
-                continuation.yield(operation)
+        try await withSchedulingTaskGroup { group in
+            for operation in operations {
+                group.addTask(at: 0) {
+                    continuation.yield(operation)
+                }
             }
         }
-        
-        await group.start()
         
         continuation.finish()
         
         await #expect(stream.collect() == Array(operations))
+    }
+    
+    @Test("Given tasks are scheduled at different times, Then all the tasks are executed in order of scheduling")
+    func executeTasksInOrderOfScheduling() async throws {
+        let (stream, continuation) = AsyncStream<Int>.makeStream()
+        let source = 0..<5
+        
+        try await withSchedulingTaskGroup { group in
+            for (time, operation) in zip(source, source).reversed() {
+                group.addTask(at: time) {
+                    continuation.yield(operation)
+                }
+            }
+        }
+        
+        continuation.finish()
+        
+        await #expect(stream.collect() == Array(source))
     }
 }
