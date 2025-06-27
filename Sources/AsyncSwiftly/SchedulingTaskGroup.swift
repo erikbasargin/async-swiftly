@@ -65,7 +65,6 @@ public struct SchedulingTaskGroup: ~Copyable {
                 queue.advance()
             }
             await withTaskExecutorPreference(executor, operation: operation)
-            queue.dequeue(instant)
         }
     }
     
@@ -130,12 +129,6 @@ extension SchedulingTaskGroup {
         func enqueue(until deadline: Instant, work: @escaping Work) {
             state.withLock {
                 $0.scheduledWork[deadline, default: []].append(work)
-            }
-        }
-        
-        func dequeue(_ instant: Instant) {
-            state.withLock {
-                $0.scheduledWork[instant] = nil
             }
         }
     }
