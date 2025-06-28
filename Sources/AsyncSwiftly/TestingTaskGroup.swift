@@ -1,5 +1,5 @@
 //
-//  SchadulingTaskGroup.swift
+//  TestingTaskGroup.swift
 //  async-swiftly
 //
 //  Created by Erik Basargin on 25/06/2025.
@@ -11,16 +11,16 @@ import DequeModule
 
 public struct TimeoutError: LocalizedError {
     public var errorDescription: String? {
-        "Scheduling task group timed out"
+        "Testing task group timed out"
     }
     public init() {}
 }
 
 @inlinable
-public func withSchedulingTaskGroup(
+public func withTestingTaskGroup(
     isolation: isolated (any Actor)? = #isolation,
     timeout seconds: TimeInterval = .infinity,
-    body: (inout SchedulingTaskGroup) -> Void
+    body: (inout TestingTaskGroup) -> Void
 ) async throws {
     try await withThrowingDiscardingTaskGroup(isolation: isolation) { baseGroup in
         if seconds.isFinite {
@@ -30,7 +30,7 @@ public func withSchedulingTaskGroup(
             }
         }
         try await withTaskExecutorPreference(SerialTaskExecutor()) {
-            var group = SchedulingTaskGroup(group: baseGroup)
+            var group = TestingTaskGroup(group: baseGroup)
             body(&group)
             try await group.start()
         }
@@ -40,7 +40,7 @@ public func withSchedulingTaskGroup(
 @usableFromInline
 final class SerialTaskExecutor: TaskExecutor, SerialExecutor {
     
-    static let queue = DispatchQueue(label: "SchedulingTaskGroup.SerialTaskExecutor")
+    static let queue = DispatchQueue(label: "TestingTaskGroup.SerialTaskExecutor")
     
     @usableFromInline
     init() {}
@@ -57,7 +57,7 @@ final class SerialTaskExecutor: TaskExecutor, SerialExecutor {
     }
 }
 
-public struct SchedulingTaskGroup: ~Copyable {
+public struct TestingTaskGroup: ~Copyable {
     
     let queue: WorkQueue
     let clock: Clock
@@ -93,7 +93,7 @@ public struct SchedulingTaskGroup: ~Copyable {
     }
 }
 
-extension SchedulingTaskGroup {
+extension TestingTaskGroup {
     
     struct Clock {
         let queue: WorkQueue
@@ -118,13 +118,13 @@ extension SchedulingTaskGroup {
     }
 }
 
-// MARK: - SchedulingTaskGroup.WorkQueue
+// MARK: - TestingTaskGroup.WorkQueue
 
-extension SchedulingTaskGroup {
+extension TestingTaskGroup {
     
     struct WorkQueue: Sendable {
         
-        typealias Instant = SchedulingTaskGroup.Clock.Instant
+        typealias Instant = TestingTaskGroup.Clock.Instant
         typealias Work = @Sendable () -> Void
         
         struct State {
@@ -165,7 +165,7 @@ extension SchedulingTaskGroup {
     }
 }
 
-extension SchedulingTaskGroup.WorkQueue: AsyncSequence {
+extension TestingTaskGroup.WorkQueue: AsyncSequence {
     
     struct Iterator: AsyncIteratorProtocol {
         
@@ -277,9 +277,9 @@ struct TaskQueue: Sendable, AsyncSequence {
     }
 }
 
-// MARK: - SchedulingTaskGroup.Clock
+// MARK: - TestingTaskGroup.Clock
 
-extension SchedulingTaskGroup.Clock: Clock {
+extension TestingTaskGroup.Clock: Clock {
     
     struct Step: Hashable, CustomStringConvertible {
         let rawValue: Int
@@ -314,7 +314,7 @@ extension SchedulingTaskGroup.Clock: Clock {
     }
 }
 
-extension SchedulingTaskGroup.Clock.Step: DurationProtocol {
+extension TestingTaskGroup.Clock.Step: DurationProtocol {
     
     static var zero: Self {
         .init(rawValue: 0)
@@ -345,9 +345,9 @@ extension SchedulingTaskGroup.Clock.Step: DurationProtocol {
     }
 }
 
-extension SchedulingTaskGroup.Clock.Instant: InstantProtocol {
+extension TestingTaskGroup.Clock.Instant: InstantProtocol {
     
-    typealias Duration = SchedulingTaskGroup.Clock.Step
+    typealias Duration = TestingTaskGroup.Clock.Step
     
     static func < (lhs: Self, rhs: Self) -> Bool {
         lhs.when < rhs.when

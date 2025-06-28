@@ -1,5 +1,5 @@
 //
-//  SchedulingTaskGroupTests.swift
+//  TestingTaskGroupTests.swift
 //  async-swiftly
 //
 //  Created by Erik Basargin on 25/06/2025.
@@ -9,14 +9,14 @@ import AsyncSwiftly
 import Testing
 import TestingSupport
 
-struct SchedulingTaskGroupTests {
+struct TestingTaskGroupTests {
 
     @Test("Given tasks are scheduled at the same time, Then all the tasks are executed in order of enqueueing")
     func executeTasksInOrderOfEnqueueing() async throws {
         let (stream, continuation) = AsyncStream.makeStream(of: Int.self)
         let operations = 0..<5
         
-        try await withSchedulingTaskGroup { group in
+        try await withTestingTaskGroup { group in
             for operation in operations {
                 group.addTask(at: 0) {
                     continuation.yield(operation)
@@ -34,7 +34,7 @@ struct SchedulingTaskGroupTests {
         let (stream, continuation) = AsyncStream.makeStream(of: Int.self)
         let source = 0..<5
         
-        try await withSchedulingTaskGroup { group in
+        try await withTestingTaskGroup { group in
             for (time, operation) in zip(source, source).reversed() {
                 group.addTask(at: time) {
                     continuation.yield(operation)
@@ -52,7 +52,7 @@ struct SchedulingTaskGroupTests {
         let order = AsyncStream.makeStream(of: Int.self)
         let dependency = AsyncStream.makeStream(of: Void.self)
         
-        try await withSchedulingTaskGroup { group in
+        try await withTestingTaskGroup { group in
             group.addTask(at: 0) {
                 order.continuation.yield(0)
                 _ = await dependency.stream.prefix(1).collect()
@@ -74,7 +74,7 @@ struct SchedulingTaskGroupTests {
     @Test("Given task suspended by long running dependency, When group exceeds provided timeout, Then group is cancelled and throws timeout error")
     func cancelTaskGroupWhenProvidedTimeoutIsExceeded() async throws {
         await #expect(throws: TimeoutError.self) {
-            try await withSchedulingTaskGroup(timeout: 1) { group in
+            try await withTestingTaskGroup(timeout: 1) { group in
                 group.addTask(at: 0) {
                     // Cannot use #expect(throws: CancellationError.self) 🥲
                     // Error: Recursive expansion of macro 'expect(throws:_:sourceLocation:performing:)'
