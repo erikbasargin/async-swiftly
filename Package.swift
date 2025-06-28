@@ -5,6 +5,9 @@ import PackageDescription
 
 let package = Package(
     name: "async-swiftly",
+    platforms: [
+        .macOS(.v15),
+    ],
     products: [
         .library(
             name: "AsyncSwiftly",
