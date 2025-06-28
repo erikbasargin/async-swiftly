@@ -111,7 +111,7 @@ extension SchedulingTaskGroup {
         
         struct State {
             var now: Instant = .init(when: .zero)
-            var scheduledWork: [Instant: Deque<Work>] = [:]
+            var scheduledWork: [Instant: TaskQueue] = [:]
         }
         
         var now: Instant {
@@ -128,7 +128,13 @@ extension SchedulingTaskGroup {
         
         func enqueue(until deadline: Instant, work: @escaping Work) {
             state.withLock {
-                $0.scheduledWork[deadline, default: []].append(work)
+                if let queue = $0.scheduledWork[deadline] {
+                    queue.yield(work)
+                } else {
+                    let queue = TaskQueue()
+                    $0.scheduledWork[deadline] = queue
+                    queue.yield(work)
+                }
             }
         }
     }
@@ -141,24 +147,71 @@ extension SchedulingTaskGroup.WorkQueue: AsyncSequence {
         let state: OSAllocatedUnfairLock<State>
         
         func next() async throws -> Work? {
-            state.withLock {
-                var instant = Instant.init(when: .zero)
-                
-                repeat {
-                    if let work = $0.scheduledWork[instant]?.popFirst() {
-                        return work
-                    } else {
-                        instant = instant.advanced(by: .step(1))
-                    }
-                } while instant <= $0.now
-                
-                return nil
-            }
+            var instant = Instant.init(when: .zero)
+            
+            repeat {
+                if let work = await state.withLock(\.scheduledWork)[instant]?.popFirst() {
+                    print("Do work at \(instant)")
+                    return work
+                } else {
+                    instant = instant.advanced(by: .step(1))
+                    print("Move to \(instant)")
+                }
+            } while instant <= state.withLock(\.now)
+            
+            return nil
         }
     }
     
     func makeAsyncIterator() -> Iterator {
         Iterator(state: state)
+    }
+}
+
+// MARK: - TaskQueue
+
+struct TaskQueue: Sendable, AsyncSequence {
+    
+    typealias Work = @Sendable () -> Void
+    
+    private let queue = AsyncStream.makeStream(of: Work.self)
+    private let counter = OSAllocatedUnfairLock(initialState: 0)
+    
+    var isEmpty: Bool {
+        counter.withLock(\.self) == 0
+    }
+    
+    struct Iterator: AsyncIteratorProtocol {
+        
+        let counter: OSAllocatedUnfairLock<Int>
+        var base: AsyncStream<Work>.Iterator
+        
+        mutating func next() async -> Work? {
+            let next = await base.next()
+            counter.withLock { $0 -= 1 }
+            return next
+        }
+    }
+    
+    func makeAsyncIterator() -> Iterator {
+        Iterator(counter: counter, base: queue.stream.makeAsyncIterator())
+    }
+    
+    func popFirst() async -> Work? {
+        guard !isEmpty else { return nil }
+        
+        var iterator = makeAsyncIterator()
+        return await iterator.next()
+    }
+    
+    @discardableResult
+    public func yield(_ value: @escaping Work) -> AsyncStream<Work>.Continuation.YieldResult {
+        counter.withLock { $0 += 1 }
+        return queue.continuation.yield(value)
+    }
+    
+    public func finish() {
+        queue.continuation.finish()
     }
 }
 
