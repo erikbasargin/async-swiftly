@@ -70,4 +70,30 @@ struct SchedulingTaskGroupTests {
         
         await #expect(order.stream.collect() == [0, 1, 2, 3])
     }
+    
+    @Test("Given task suspended by long running dependency, When group exceeds provided timeout, Then group is cancelled and throws timeout error")
+    func cancelTaskGroupWhenProvidedTimeoutIsExceeded() async throws {
+        await #expect(throws: TimeoutError.self) {
+            try await withSchedulingTaskGroup(timeout: 1) { group in
+                group.addTask(at: 0) {
+                    // Cannot use #expect(throws: CancellationError.self) 🥲
+                    // Error: Recursive expansion of macro 'expect(throws:_:sourceLocation:performing:)'
+                    //
+                    // await #expect(throws: TimeoutError.self) {
+                    //     try await Task.sleep(for: .seconds(5))
+                    // }
+                    
+                    await confirmation { longRunningTaskIsCancelled in
+                        do {
+                            try await Task.sleep(for: .seconds(5))
+                        } catch is CancellationError {
+                            longRunningTaskIsCancelled()
+                        } catch {
+                            Issue.record(error)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

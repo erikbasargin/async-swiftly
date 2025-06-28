@@ -9,12 +9,26 @@ import os
 import Foundation
 import DequeModule
 
+public struct TimeoutError: LocalizedError {
+    public var errorDescription: String? {
+        "Scheduling task group timed out"
+    }
+    public init() {}
+}
+
 @inlinable
 public func withSchedulingTaskGroup(
     isolation: isolated (any Actor)? = #isolation,
+    timeout seconds: TimeInterval = .infinity,
     body: (inout SchedulingTaskGroup) -> Void
 ) async throws {
     try await withThrowingDiscardingTaskGroup(isolation: isolation) { baseGroup in
+        if seconds.isFinite {
+            baseGroup.addTask {
+                try await Task.sleep(for: .seconds(seconds))
+                throw TimeoutError()
+            }
+        }
         try await withTaskExecutorPreference(SerialTaskExecutor()) {
             var group = SchedulingTaskGroup(group: baseGroup)
             body(&group)
@@ -62,9 +76,13 @@ public struct SchedulingTaskGroup: ~Copyable {
         
         group.addTask { [queue] in
             queue.enqueue(until: instant) {
+                queue.dequeue(instant)
                 queue.advance()
             }
             await withTaskExecutorPreference(executor, operation: operation)
+            queue.enqueue(until: nextInstant) {
+                queue.dequeue(nextInstant)
+            }
         }
     }
     
@@ -111,6 +129,7 @@ extension SchedulingTaskGroup {
         
         struct State {
             var now: Instant = .init(when: .zero)
+            var readyToComplete: [Instant: Bool] = [:]
             var scheduledWork: [Instant: TaskQueue] = [:]
         }
         
@@ -137,6 +156,12 @@ extension SchedulingTaskGroup {
                 }
             }
         }
+        
+        func dequeue(_ instant: Instant) {
+            state.withLock {
+                $0.readyToComplete[instant] = true
+            }
+        }
     }
 }
 
@@ -147,19 +172,56 @@ extension SchedulingTaskGroup.WorkQueue: AsyncSequence {
         let state: OSAllocatedUnfairLock<State>
         
         func next() async throws -> Work? {
-            var instant = Instant.init(when: .zero)
+            func popFirstWork() async -> Work? {
+                var instant = Instant.init(when: .zero)
+                
+                repeat {
+                    if let work = await state.withLock(\.scheduledWork)[instant]?.popFirst() {
+                        return work
+                    } else {
+                        instant = instant.advanced(by: .step(1))
+                    }
+                } while instant <= state.withLock(\.now)
+                
+                return nil
+            }
             
             repeat {
-                if let work = await state.withLock(\.scheduledWork)[instant]?.popFirst() {
-                    print("Do work at \(instant)")
+                if let work = await popFirstWork() {
                     return work
-                } else {
-                    instant = instant.advanced(by: .step(1))
-                    print("Move to \(instant)")
                 }
-            } while instant <= state.withLock(\.now)
-            
-            return nil
+                
+                // There is no work currently available. If we're in this situation that means that all operations
+                // are suspended (the worst case: we've got into dependecy cicle, it can be resoved only with global timeout).
+                // We should not complete unless we've got cancellation or all operations are completed, so,
+                // we need to take the first running operation, and await until work is available.
+                
+                let queue: TaskQueue? = state.withLock {
+                    // TODO: - we don't need to run from Step.zero, whenever operation completes we can shift start time
+                    var instant = Instant.init(when: .zero)
+                    repeat {
+                        if let queue = $0.scheduledWork[instant] {
+                            if $0.readyToComplete[instant] ?? false {
+                                // TODO: - Is it possible to see non-empty queue here, can we reproduce it? Should we register anomaly and return queue to complete remaining work?
+                                assert(queue.isEmpty == true, "We should not have scheduled work for this instant")
+                                $0.readyToComplete[instant] = nil
+                                $0.scheduledWork[instant]?.finish()
+                                $0.scheduledWork[instant] = nil
+                                instant = instant.advanced(by: .step(1))
+                            } else {
+                                return queue
+                            }
+                        } else {
+                            instant = instant.advanced(by: .step(1))
+                        }
+                    } while instant <= $0.now
+                    
+                    return nil
+                }
+                
+                return await queue?.first(where: { _ in true })
+                
+            } while true
         }
     }
     
