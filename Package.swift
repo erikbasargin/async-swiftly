@@ -11,7 +11,7 @@ let package = Package(
     products: [
         .library(
             name: "AsyncSwiftly",
-            targets: ["AsyncSwiftly"]
+            targets: ["AsyncSwiftly"],
         ),
     ],
     dependencies: [
@@ -22,16 +22,16 @@ let package = Package(
             name: "AsyncSwiftly",
             dependencies: [
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
-            ]
+            ],
         ),
         .target(
-            name: "AsyncMaterializedSequence"
+            name: "AsyncMaterializedSequence",
         ),
         .target(
             name: "AsyncTrigger",
             dependencies: [
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
-            ]
+            ],
         ),
         .target(
             name: "TestingSupport",
@@ -44,27 +44,27 @@ let package = Package(
             dependencies: [
                 "AsyncSwiftly",
                 "TestingSupport",
-            ]
+            ],
         ),
         .testTarget(
             name: "AsyncMaterializedSequenceTests",
             dependencies: [
                 "AsyncMaterializedSequence", 
                 "TestingSupport",
-            ]
+            ],
         ),
         .testTarget(
             name: "AsyncTriggerTests",
             dependencies: [
                 "AsyncTrigger",
                 "TestingSupport",
-            ]
+            ],
         ),
         .testTarget(
             name: "TestingSupportTests",
             dependencies: [
                 "TestingSupport",
-            ]
+            ],
         ),
     ]
 )
