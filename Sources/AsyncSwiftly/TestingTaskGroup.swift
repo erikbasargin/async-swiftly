@@ -69,15 +69,26 @@ public struct TestingTaskGroup: ~Copyable {
     }
     
     public mutating func addTask(at rawStep: Int, operation: sending @escaping @isolated(any) () async -> Void) {
-        let instant = Clock.Instant(when: .step(rawStep))
+        let duration = Clock.Step.step(rawStep)
+        let instant = Clock.Instant(when: duration)
         let nextInstant = instant.advanced(by: .step(1))
         let executor = OperationExecutor(instant: nextInstant, queue: queue)
         
+        let shift: () -> Void = { [queue, clock] in
+            var from = clock.now
+            
+            repeat {
+                let step = from
+                queue.enqueue(until: step) {
+                    queue.dequeue(step)
+                    queue.advance()
+                }
+                from = from.advanced(by: .step(1))
+            } while from <= instant
+        }
+        
         group.addTask { [queue] in
-            queue.enqueue(until: instant) {
-                queue.dequeue(instant)
-                queue.advance()
-            }
+            shift()
             await withTaskExecutorPreference(executor, operation: operation)
             queue.enqueue(until: nextInstant) {
                 queue.dequeue(nextInstant)

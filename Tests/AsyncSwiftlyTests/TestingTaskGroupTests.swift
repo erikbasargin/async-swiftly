@@ -14,7 +14,7 @@ struct TestingTaskGroupTests {
     @Test("Given tasks are scheduled at the same time, Then all the tasks are executed in order of enqueueing")
     func executeTasksInOrderOfEnqueueing() async throws {
         let (stream, continuation) = AsyncStream.makeStream(of: Int.self)
-        let operations = 0..<5
+        let operations = 0..<100
         
         try await withTestingTaskGroup { group in
             for operation in operations {
@@ -32,7 +32,7 @@ struct TestingTaskGroupTests {
     @Test("Given tasks are scheduled at different times, Then all the tasks are executed in order of scheduling")
     func executeTasksInOrderOfScheduling() async throws {
         let (stream, continuation) = AsyncStream.makeStream(of: Int.self)
-        let source = 0..<5
+        let source = 0..<100
         
         try await withTestingTaskGroup { group in
             for (time, operation) in zip(source, source).reversed() {
@@ -47,6 +47,26 @@ struct TestingTaskGroupTests {
         await #expect(stream.collect() == Array(source))
     }
     
+    @Test("Given tasks with large time gaps, Then all the tasks are executed in order of scheduling")
+    func executeTasksWithLargeTimeGaps() async throws {
+        let (stream, continuation) = AsyncStream.makeStream(of: Int.self)
+        
+        try await withTestingTaskGroup { group in
+            group.addTask(at: 10) {
+                continuation.yield(1)
+            }
+            group.addTask(at: 20) {
+                continuation.yield(2)
+            }
+            group.addTask(at: 50) {
+                continuation.yield(3)
+            }
+        }
+        
+        continuation.finish()
+        
+        await #expect(stream.collect() == [1, 2, 3])
+    }
     @Test("Given task suspended by dependency, When another task resolves dependency, Then dependent task resumes its work")
     func resumeDependentTaskWhenDependencyIsResolved() async throws {
         let order = AsyncStream.makeStream(of: Int.self)
