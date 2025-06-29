@@ -7,7 +7,6 @@
 
 import os
 import Foundation
-import DequeModule
 
 public struct TimeoutError: LocalizedError {
     public var errorDescription: String? {
