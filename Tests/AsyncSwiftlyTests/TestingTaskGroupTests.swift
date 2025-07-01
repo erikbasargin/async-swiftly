@@ -16,7 +16,7 @@ struct TestingTaskGroupTests {
         let (stream, continuation) = AsyncStream.makeStream(of: Int.self)
         let operations = 0..<100
         
-        try await withTestingTaskGroup { group in
+        _ = try await withTestingTaskGroup(observing: Void.self) { group in
             for operation in operations {
                 group.addTask(at: 0) {
                     continuation.yield(operation)
@@ -34,7 +34,7 @@ struct TestingTaskGroupTests {
         let (stream, continuation) = AsyncStream.makeStream(of: Int.self)
         let source = 0..<100
         
-        try await withTestingTaskGroup { group in
+        _ = try await withTestingTaskGroup(observing: Void.self) { group in
             for (time, operation) in zip(source, source).reversed() {
                 group.addTask(at: time) {
                     continuation.yield(operation)
@@ -51,7 +51,7 @@ struct TestingTaskGroupTests {
     func executeTasksWithLargeTimeGaps() async throws {
         let (stream, continuation) = AsyncStream.makeStream(of: Int.self)
         
-        try await withTestingTaskGroup { group in
+        _ = try await withTestingTaskGroup(observing: Void.self) { group in
             group.addTask(at: 10) {
                 continuation.yield(1)
             }
@@ -72,7 +72,7 @@ struct TestingTaskGroupTests {
         let order = AsyncStream.makeStream(of: Int.self)
         let dependency = AsyncStream.makeStream(of: Void.self)
         
-        try await withTestingTaskGroup { group in
+        _ = try await withTestingTaskGroup(observing: Void.self) { group in
             group.addTask(at: 0) {
                 order.continuation.yield(0)
                 _ = await dependency.stream.prefix(1).collect()
@@ -94,7 +94,7 @@ struct TestingTaskGroupTests {
     @Test("Given task suspended by long running dependency, When group exceeds provided timeout, Then group is cancelled and throws timeout error")
     func cancelTaskGroupWhenProvidedTimeoutIsExceeded() async throws {
         await #expect(throws: TimeoutError.self) {
-            try await withTestingTaskGroup(timeout: 1) { group in
+            _ = try await withTestingTaskGroup(observing: Void.self, timeout: 1) { group in
                 group.addTask(at: 0) {
                     // Cannot use #expect(throws: CancellationError.self) 🥲
                     // Error: Recursive expansion of macro 'expect(throws:_:sourceLocation:performing:)'
@@ -115,5 +115,31 @@ struct TestingTaskGroupTests {
                 }
             }
         }
+    }
+    
+    @Test("Given system under test produces values, When stream is observed, Then values are received in correct moment")
+    func valuesAreObserved() async throws {
+        let (stream, continuation) = AsyncStream.makeStream(of: Int.self)
+        
+        let result = try await withTestingTaskGroup { group in
+            group.addObserver(at: 0) {
+                stream.prefix(3)
+            }
+            group.addTask(at: 10) {
+                continuation.yield(1)
+            }
+            group.addTask(at: 20) {
+                continuation.yield(2)
+            }
+            group.addTask(at: 50) {
+                continuation.yield(3)
+            }
+        }
+        
+        #expect(result[0] == [
+            .value(10, 1),
+            .value(20, 2),
+            .value(50, 3),
+        ])
     }
 }

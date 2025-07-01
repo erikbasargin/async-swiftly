@@ -15,12 +15,22 @@ public struct TimeoutError: LocalizedError {
     public init() {}
 }
 
+public enum Event<Element> {
+    case value(Int, Element)
+    case failure(Int) //, any Error)
+    case cancelled(Int)
+    case finished(Int)
+}
+
+extension Event: Equatable where Element: Equatable {}
+
 @inlinable
-public func withTestingTaskGroup(
+public func withTestingTaskGroup<ObservationElement>(
+    observing observeType: ObservationElement.Type = ObservationElement.self,
     isolation: isolated (any Actor)? = #isolation,
     timeout seconds: TimeInterval = .infinity,
-    body: (inout TestingTaskGroup) -> Void
-) async throws {
+    body: (inout TestingTaskGroup<ObservationElement>) -> Void
+) async throws -> [Int: Array<Event<ObservationElement>>] {
     try await withThrowingDiscardingTaskGroup(isolation: isolation) { baseGroup in
         if seconds.isFinite {
             baseGroup.addTask {
@@ -28,10 +38,10 @@ public func withTestingTaskGroup(
                 throw TimeoutError()
             }
         }
-        try await withTaskExecutorPreference(SerialTaskExecutor()) {
-            var group = TestingTaskGroup(group: baseGroup)
+        return try await withTaskExecutorPreference(SerialTaskExecutor()) {
+            var group = TestingTaskGroup<ObservationElement>(group: baseGroup)
             body(&group)
-            try await group.start()
+            return try await group.start()
         }
     }
 }
@@ -56,7 +66,7 @@ final class SerialTaskExecutor: TaskExecutor, SerialExecutor {
     }
 }
 
-public struct TestingTaskGroup: ~Copyable {
+public struct TestingTaskGroup<ObservationElement>: ~Copyable {
     
     let queue: WorkQueue
     let clock: Clock
@@ -66,6 +76,10 @@ public struct TestingTaskGroup: ~Copyable {
         self.queue = WorkQueue()
         self.clock = Clock(queue: queue)
         self.group = group
+    }
+    
+    public mutating func addObserver<Failure: Error>(at rawStep: Int, _ observer: () -> some AsyncSequence<ObservationElement, Failure>) {
+        
     }
     
     public mutating func addTask(at rawStep: Int, operation: sending @escaping @isolated(any) () async -> Void) {
@@ -96,10 +110,11 @@ public struct TestingTaskGroup: ~Copyable {
         }
     }
     
-    public consuming func start() async throws {
+    public consuming func start() async throws -> [Int: Array<Event<ObservationElement>>] {
         for try await work in queue {
             work()
         }
+        return [:]
     }
 }
 
