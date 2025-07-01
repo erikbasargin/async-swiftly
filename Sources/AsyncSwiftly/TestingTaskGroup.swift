@@ -93,10 +93,8 @@ public struct TestingTaskGroup<ObservationElement>: ~Copyable {
             
             repeat {
                 let step = from
-                queue.enqueue(until: step) {
-                    queue.dequeue(step)
-                    queue.advance()
-                }
+                queue.dequeue(step)
+                queue.advance()
                 from = from.advanced(by: .step(1))
             } while from <= instant
         }
@@ -104,9 +102,7 @@ public struct TestingTaskGroup<ObservationElement>: ~Copyable {
         group.addTask { [queue] in
             shift()
             await withTaskExecutorPreference(executor, operation: operation)
-            queue.enqueue(until: nextInstant) {
-                queue.dequeue(nextInstant)
-            }
+            queue.dequeue(nextInstant)
         }
     }
     
