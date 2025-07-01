@@ -67,6 +67,7 @@ struct TestingTaskGroupTests {
         
         await #expect(stream.collect() == [1, 2, 3])
     }
+    
     @Test("Given task suspended by dependency, When another task resolves dependency, Then dependent task resumes its work")
     func resumeDependentTaskWhenDependencyIsResolved() async throws {
         let order = AsyncStream.makeStream(of: Int.self)
@@ -117,29 +118,52 @@ struct TestingTaskGroupTests {
         }
     }
     
-    @Test("Given system under test produces values, When stream is observed, Then values are received in correct moment")
-    func valuesAreObserved() async throws {
+    @Test("Given observed sequence is finite, When sequence completes, Then observation finishes")
+    func observationFinishes() async throws {
         let (stream, continuation) = AsyncStream.makeStream(of: Int.self)
         
         let result = try await withTestingTaskGroup { group in
             group.addObserver(at: 0) {
-                stream.prefix(3)
+                stream.prefix(2)
             }
-            group.addTask(at: 10) {
+            group.addTask(at: 1) {
                 continuation.yield(1)
             }
-            group.addTask(at: 20) {
+            group.addTask(at: 2) {
                 continuation.yield(2)
             }
-            group.addTask(at: 50) {
+            group.addTask(at: 3) {
                 continuation.yield(3)
             }
         }
         
         #expect(result[0] == [
-            .value(10, 1),
-            .value(20, 2),
-            .value(50, 3),
+            .value(1, 1),
+            .value(2, 2),
+            .finished(2),
+        ])
+    }
+    
+    @Test("Given observed sequence is infinite, When all tasks complete, Then observation finishes")
+    func infiniteObservationFinishes() async throws {
+        let (stream, continuation) = AsyncStream.makeStream(of: Int.self)
+        
+        let result = try await withTestingTaskGroup { group in
+            group.addObserver(at: 0) {
+                stream
+            }
+            group.addTask(at: 1) {
+                continuation.yield(1)
+            }
+            group.addTask(at: 2) {
+                continuation.yield(2)
+            }
+        }
+        
+        #expect(result[0] == [
+            .value(1, 1),
+            .value(2, 2),
+            .finished(3),
         ])
     }
 }

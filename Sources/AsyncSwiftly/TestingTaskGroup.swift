@@ -5,6 +5,8 @@
 //  Created by Erik Basargin on 25/06/2025.
 //
 
+import AsyncTrigger
+import AsyncAlgorithms
 import os
 import Foundation
 
@@ -17,12 +19,11 @@ public struct TimeoutError: LocalizedError {
 
 public enum Event<Element> {
     case value(Int, Element)
-    case failure(Int) //, any Error)
-    case cancelled(Int)
     case finished(Int)
 }
 
 extension Event: Equatable where Element: Equatable {}
+extension Event: Sendable where Element: Sendable {}
 
 @inlinable
 public func withTestingTaskGroup<ObservationElement>(
@@ -66,11 +67,13 @@ final class SerialTaskExecutor: TaskExecutor, SerialExecutor {
     }
 }
 
-public struct TestingTaskGroup<ObservationElement>: ~Copyable {
+public struct TestingTaskGroup<ObservationElement: Sendable>: ~Copyable {
     
     let queue: WorkQueue
     let clock: Clock
     var group: ThrowingDiscardingTaskGroup<any Error>
+    let events = EventsStorage<ObservationElement>()
+    let finishObservationTrigger = AsyncTrigger()
     
     public init(group: ThrowingDiscardingTaskGroup<any Error>) {
         self.queue = WorkQueue()
@@ -78,31 +81,32 @@ public struct TestingTaskGroup<ObservationElement>: ~Copyable {
         self.group = group
     }
     
-    public mutating func addObserver<Failure: Error>(at rawStep: Int, _ observer: () -> some AsyncSequence<ObservationElement, Failure>) {
-        
+    public mutating func addObserver<Failure: Error>(
+        at rawStep: Int,
+        observer: @escaping @Sendable () -> some AsyncSequence<ObservationElement, Failure> & Sendable
+    ) {
+        addTask(at: rawStep) { [clock, events, finishObservationTrigger] in
+            do {
+                for try await element in observer().takeUntil(finishObservationTrigger) {
+                    let tick = clock.now.when.rawValue
+                    events.append(.value(tick, element), for: rawStep)
+                }
+                let tick = clock.now.when.rawValue
+                events.append(.finished(tick), for: rawStep)
+            } catch {
+                let tick = clock.now.when.rawValue
+                events.append(.finished(tick), for: rawStep)
+            }
+        }
     }
     
     public mutating func addTask(at rawStep: Int, operation: sending @escaping @isolated(any) () async -> Void) {
-        let duration = Clock.Step.step(rawStep)
-        let instant = Clock.Instant(when: duration)
-        let nextInstant = instant.advanced(by: .step(1))
-        let executor = OperationExecutor(instant: nextInstant, queue: queue)
-        
-        let shift: () -> Void = { [queue, clock] in
-            var from = clock.now
-            
-            repeat {
-                let step = from
-                queue.dequeue(step)
-                queue.advance()
-                from = from.advanced(by: .step(1))
-            } while from <= instant
-        }
+        let instant = Clock.Instant(when: .step(rawStep))
+        let executor = OperationExecutor(instant: instant, queue: queue)
         
         group.addTask { [queue] in
-            shift()
             await withTaskExecutorPreference(executor, operation: operation)
-            queue.dequeue(nextInstant)
+            queue.markAsReadyToComplete(instant)
         }
     }
     
@@ -110,7 +114,17 @@ public struct TestingTaskGroup<ObservationElement>: ~Copyable {
         for try await work in queue {
             work()
         }
-        return [:]
+        
+        finishObservationTrigger.fire()
+        
+        if queue.isAnyWorkLeft {
+            // At this point if work remains unfinished, we've got some tasks that cannot be resolved in provided range of time.
+            // Wait until all work finishes or times out.
+            
+            await queue.waitForAll()
+        }
+        
+        return events.snapshot()
     }
 }
 
@@ -128,6 +142,8 @@ extension TestingTaskGroup {
         init(instant: Clock.Instant, queue: WorkQueue) {
             self.instant = instant
             self.queue = queue
+            
+            queue.prepare(instant)
         }
         
         func enqueue(_ job: consuming ExecutorJob) {
@@ -150,6 +166,7 @@ extension TestingTaskGroup {
         
         fileprivate struct State {
             var now: Instant = .init(when: .zero)
+            var end: Instant = .init(when: .zero)
             var readyToComplete: [Instant: Bool] = [:]
             var scheduledWork: [Instant: TaskQueue] = [:]
         }
@@ -158,29 +175,71 @@ extension TestingTaskGroup {
             state.withLock(\.now)
         }
         
+        var isAnyWorkLeft: Bool {
+            state.withLock {
+                !$0.scheduledWork.isEmpty
+            }
+        }
+        
         private let state = OSAllocatedUnfairLock(initialState: State())
         
-        func advance() {
+        func advance(by duration: Clock.Step = .step(1)) {
             state.withLock {
-                $0.now = $0.now.advanced(by: .step(1))
+                $0.now = $0.now.advanced(by: duration)
+            }
+        }
+        
+        func setNow(_ instant: Instant) {
+            state.withLock { $0.now = instant }
+        }
+        
+        func prepare(_ instant: Instant) {
+            state.withLock {
+                if $0.scheduledWork[instant] == nil {
+                    $0.scheduledWork[instant] = TaskQueue()
+                    $0.end = $0.end < instant.advanced(by: .step(1)) ? instant.advanced(by: .step(1)) : $0.end
+                }
             }
         }
         
         func enqueue(until deadline: Instant, work: @escaping Work) {
             state.withLock {
-                if let queue = $0.scheduledWork[deadline] {
-                    queue.yield(work)
-                } else {
-                    let queue = TaskQueue()
-                    $0.scheduledWork[deadline] = queue
-                    queue.yield(work)
-                }
+                $0.scheduledWork[deadline]!.yield(work)
             }
         }
         
-        func dequeue(_ instant: Instant) {
+        func markAsReadyToComplete(_ instant: Instant) {
             state.withLock {
                 $0.readyToComplete[instant] = true
+            }
+        }
+        
+        func waitForAll() async {
+            while isAnyWorkLeft {
+                let queue: TaskQueue? = state.withLock {
+                    var instant = Instant.init(when: .zero)
+                    while instant < $0.end {
+                        if let queue = $0.scheduledWork[instant] {
+                            if $0.readyToComplete[instant] ?? false, queue.isEmpty {
+                                $0.readyToComplete[instant] = nil
+                                $0.scheduledWork[instant]?.finish()
+                                $0.scheduledWork[instant] = nil
+                                instant = instant.advanced(by: .step(1))
+                                return nil
+                            } else {
+                                return queue
+                            }
+                        } else {
+                            instant = instant.advanced(by: .step(1))
+                        }
+                    }
+                    
+                    return nil
+                }
+                
+                if let work = await queue?.pop() {
+                    work()
+                }
             }
         }
     }
@@ -190,59 +249,58 @@ extension TestingTaskGroup.WorkQueue: AsyncSequence {
     
     struct Iterator: AsyncIteratorProtocol {
         
+        private enum NextAction {
+            case popFirstWork(TaskQueue)
+            case awaitNextWork(TaskQueue)
+        }
+        
         fileprivate let state: OSAllocatedUnfairLock<State>
         
         func next() async throws -> Work? {
-            func popFirstWork() async -> Work? {
-                var instant = Instant.init(when: .zero)
-                
-                repeat {
-                    if let work = await state.withLock(\.scheduledWork)[instant]?.pop() {
-                        return work
-                    } else {
-                        instant = instant.advanced(by: .step(1))
-                    }
-                } while instant <= state.withLock(\.now)
-                
-                return nil
-            }
-            
-            repeat {
-                if let work = await popFirstWork() {
-                    return work
-                }
-                
-                // There is no work currently available. If we're in this situation that means that all operations
-                // are suspended (the worst case: we've got into dependecy cicle, it can be resoved only with global timeout).
-                // We should not complete unless we've got cancellation or all operations are completed, so,
-                // we need to take the first running operation, and await until work is available.
-                
-                let queue: TaskQueue? = state.withLock {
-                    // TODO: - we don't need to run from Step.zero, whenever operation completes we can shift start time
+            func nextAction() -> NextAction? {
+                state.withLock {
                     var instant = Instant.init(when: .zero)
-                    repeat {
+                    while $0.now < $0.end {
                         if let queue = $0.scheduledWork[instant] {
-                            if $0.readyToComplete[instant] ?? false {
-                                // TODO: - Is it possible to see non-empty queue here, can we reproduce it? Should we register anomaly and return queue to complete remaining work?
-                                assert(queue.isEmpty == true, "We should not have scheduled work for this instant")
+                            if $0.readyToComplete[instant] ?? false, queue.isEmpty {
                                 $0.readyToComplete[instant] = nil
                                 $0.scheduledWork[instant]?.finish()
                                 $0.scheduledWork[instant] = nil
                                 instant = instant.advanced(by: .step(1))
+                                $0.now = $0.now < instant ? instant : $0.now
+                                return nil
+                            } else if queue.isEmpty {
+                                instant = instant.advanced(by: .step(1))
+                                $0.now = $0.now < instant ? instant : $0.now
                             } else {
-                                return queue
+                                return .popFirstWork(queue)
                             }
                         } else {
                             instant = instant.advanced(by: .step(1))
+                            $0.now = $0.now < instant ? instant : $0.now
                         }
-                    } while instant <= $0.now
+                    }
                     
                     return nil
                 }
+            }
+            
+            repeat {
+                for _ in 0..<100 {
+                    await Task.yield()
+                }
                 
-                return await queue?.first(where: { _ in true })
-                
-            } while true
+                switch nextAction() {
+                case let .awaitNextWork(queue):
+                    return await queue.first(where: { _ in true })
+                case let .popFirstWork(queue):
+                    return await queue.pop()
+                case .none:
+                    continue
+                }
+            } while state.withLock { $0.now < $0.end }
+            
+            return nil
         }
     }
     
@@ -363,5 +421,21 @@ extension TestingTaskGroup.Clock.Instant: InstantProtocol {
 
     func duration(to other: Self) -> Duration {
         other.when - when
+    }
+}
+
+// MARK: - EventsStorage
+
+struct EventsStorage<Element: Sendable> {
+    private let storage: OSAllocatedUnfairLock<[Int: [Event<Element>]]> = .init(initialState: [:])
+
+    func append(_ event: Event<Element>, for observerID: Int) {
+        storage.withLock {
+            $0[observerID, default: []].append(event)
+        }
+    }
+
+    func snapshot() -> [Int: [Event<Element>]] {
+        storage.withLock(\.self)
     }
 }

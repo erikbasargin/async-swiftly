@@ -21,6 +21,8 @@ let package = Package(
         .target(
             name: "AsyncSwiftly",
             dependencies: [
+                "AsyncTrigger",
+                "AsyncMaterializedSequence",
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             ],
         ),
