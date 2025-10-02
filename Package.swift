@@ -1,4 +1,4 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 6.2
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -23,21 +23,33 @@ let package = Package(
             dependencies: [
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             ],
+            swiftSettings: [
+                .treatAllWarnings(as: .error),
+            ]
         ),
         .target(
             name: "AsyncMaterializedSequence",
+            swiftSettings: [
+                .treatAllWarnings(as: .error),
+            ]
         ),
         .target(
             name: "AsyncTrigger",
             dependencies: [
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             ],
+            swiftSettings: [
+                .treatAllWarnings(as: .error),
+            ]
         ),
         .target(
             name: "TestingSupport",
             dependencies: [
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             ],
+            swiftSettings: [
+                .treatAllWarnings(as: .error),
+            ]
         ),
         .testTarget(
             name: "AsyncSwiftlyTests",
@@ -45,6 +57,9 @@ let package = Package(
                 "AsyncSwiftly",
                 "TestingSupport",
             ],
+            swiftSettings: [
+                .treatAllWarnings(as: .error),
+            ]
         ),
         .testTarget(
             name: "AsyncMaterializedSequenceTests",
@@ -52,6 +67,9 @@ let package = Package(
                 "AsyncMaterializedSequence", 
                 "TestingSupport",
             ],
+            swiftSettings: [
+                .treatAllWarnings(as: .error),
+            ]
         ),
         .testTarget(
             name: "AsyncTriggerTests",
@@ -59,12 +77,18 @@ let package = Package(
                 "AsyncTrigger",
                 "TestingSupport",
             ],
+            swiftSettings: [
+                .treatAllWarnings(as: .error),
+            ]
         ),
         .testTarget(
             name: "TestingSupportTests",
             dependencies: [
                 "TestingSupport",
             ],
+            swiftSettings: [
+                .treatAllWarnings(as: .error),
+            ]
         ),
     ]
 )
