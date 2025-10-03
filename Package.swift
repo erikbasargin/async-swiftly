@@ -3,6 +3,14 @@
 
 import PackageDescription
 
+var defaultSwiftSettings: [SwiftSetting] {
+    [
+        .treatAllWarnings(as: .error),
+        .enableUpcomingFeature("ExistentialAny"),
+        .enableUpcomingFeature("NonisolatedNonsendingBy"),
+    ]
+}
+
 let package = Package(
     name: "async-swiftly",
     platforms: [
@@ -23,33 +31,25 @@ let package = Package(
             dependencies: [
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             ],
-            swiftSettings: [
-                .treatAllWarnings(as: .error),
-            ]
+            swiftSettings: defaultSwiftSettings,
         ),
         .target(
             name: "AsyncMaterializedSequence",
-            swiftSettings: [
-                .treatAllWarnings(as: .error),
-            ]
+            swiftSettings: defaultSwiftSettings,
         ),
         .target(
             name: "AsyncTrigger",
             dependencies: [
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             ],
-            swiftSettings: [
-                .treatAllWarnings(as: .error),
-            ]
+            swiftSettings: defaultSwiftSettings,
         ),
         .target(
             name: "TestingSupport",
             dependencies: [
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             ],
-            swiftSettings: [
-                .treatAllWarnings(as: .error),
-            ]
+            swiftSettings: defaultSwiftSettings,
         ),
         .testTarget(
             name: "AsyncSwiftlyTests",
@@ -57,9 +57,7 @@ let package = Package(
                 "AsyncSwiftly",
                 "TestingSupport",
             ],
-            swiftSettings: [
-                .treatAllWarnings(as: .error),
-            ]
+            swiftSettings: defaultSwiftSettings,
         ),
         .testTarget(
             name: "AsyncMaterializedSequenceTests",
@@ -67,9 +65,7 @@ let package = Package(
                 "AsyncMaterializedSequence", 
                 "TestingSupport",
             ],
-            swiftSettings: [
-                .treatAllWarnings(as: .error),
-            ]
+            swiftSettings: defaultSwiftSettings,
         ),
         .testTarget(
             name: "AsyncTriggerTests",
@@ -77,18 +73,14 @@ let package = Package(
                 "AsyncTrigger",
                 "TestingSupport",
             ],
-            swiftSettings: [
-                .treatAllWarnings(as: .error),
-            ]
+            swiftSettings: defaultSwiftSettings,
         ),
         .testTarget(
             name: "TestingSupportTests",
             dependencies: [
                 "TestingSupport",
             ],
-            swiftSettings: [
-                .treatAllWarnings(as: .error),
-            ]
+            swiftSettings: defaultSwiftSettings,
         ),
     ]
 )

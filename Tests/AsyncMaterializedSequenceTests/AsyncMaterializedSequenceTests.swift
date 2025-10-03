@@ -50,7 +50,7 @@ struct AsyncMaterializedSequenceTests {
 
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func materialize_produces_completed_event_when_source_sequence_throws() async throws {
-        let source = AsyncThrowingStream<Int, Error> { continuation in
+        let source = AsyncThrowingStream<Int, any Error> { continuation in
             continuation.finish(throwing: TestError())
         }
         
