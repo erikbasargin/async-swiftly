@@ -5,7 +5,7 @@ import AsyncMaterializedSequence
 struct AsyncMaterializedSequenceTests {
 
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
-    @Test func materialize_produces_next_events_of_values_of_original_element() async throws {
+    @Test func `Materialize produces next events of values of original element`() async throws {
         let source = 1...3
         let sequence = source.async.materialize().prefix(source.count)
         
@@ -17,7 +17,7 @@ struct AsyncMaterializedSequenceTests {
     }
 
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
-    @Test func materialize_produces_completed_event_when_source_sequence_completes() async throws {
+    @Test func `Materialize produces completed event when source sequence completes`() async throws {
         let source = 0..<1
         let sequence = source.async.materialize()
         
@@ -28,7 +28,7 @@ struct AsyncMaterializedSequenceTests {
     }
 
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
-    @Test func materialize_produces_completed_event_when_source_sequence_is_empty() async throws {
+    @Test func `Materialize produces completed event when source sequence is empty`() async throws {
         let source: [Int] = []
         let sequence = source.async.materialize()
         
@@ -38,7 +38,7 @@ struct AsyncMaterializedSequenceTests {
     }
     
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
-    @Test func materialize_forwards_termination_from_source_when_iteration_is_finished() async throws {
+    @Test func `Materialize forwards termination from source when iteration is finished`() async throws {
         let source = 1...3
         
         var iterator = source.async.materialize().makeAsyncIterator()
@@ -49,7 +49,7 @@ struct AsyncMaterializedSequenceTests {
     }
 
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
-    @Test func materialize_produces_completed_event_when_source_sequence_throws() async throws {
+    @Test func `Materialize produces completed event when source sequence throws`() async throws {
         let source = AsyncThrowingStream<Int, any Error> { continuation in
             continuation.finish(throwing: TestError())
         }
@@ -70,7 +70,7 @@ struct AsyncMaterializedSequenceTests {
     }
 
     @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
-    @Test func materialize_produces_completed_event_when_source_sequence_is_cancelled() async throws {
+    @Test func `Materialize produces completed event when source sequence is cancelled`() async throws {
         let trigger = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
         let source = AsyncStream<Int> { continuation in
             continuation.yield(0)

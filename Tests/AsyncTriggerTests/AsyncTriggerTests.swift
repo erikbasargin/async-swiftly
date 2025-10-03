@@ -4,7 +4,7 @@ import TestingSupport
 
 struct AsyncTriggerTests {
     
-    @Test func trigger_resumes_consumers_when_fire_is_called() async throws {
+    @Test func `Trigger resumes consumers when fire is called`() async throws {
         let trigger = AsyncTrigger()
         
         async let work1 = trigger()
@@ -15,7 +15,7 @@ struct AsyncTriggerTests {
         await #expect((work1, work2) == (.triggered, .triggered))
     }
     
-    @Test func trigger_resumes_consumers_immediately_given_trigger_is_fired() async throws {
+    @Test func `Trigger resumes consumers immediately given trigger is fired`() async throws {
         let trigger = AsyncTrigger()
         trigger.fire()
         
@@ -25,7 +25,7 @@ struct AsyncTriggerTests {
         await #expect((work1, work2) == (.triggered, .triggered))
     }
     
-    @Test func trigger_consumer_resumes_when_task_is_cancelled() async throws {
+    @Test func `Trigger consumer resumes when task is cancelled`() async throws {
         let trigger = AsyncTrigger()
         let work = Task(operation: trigger.callAsFunction)
         
@@ -34,7 +34,7 @@ struct AsyncTriggerTests {
         await #expect(work.value == .cancelled)
     }
     
-    @Test func trigger_is_async_sequence() async throws {
+    @Test func `Trigger is async sequence`() async throws {
         let trigger = AsyncTrigger()
         
         async let work = trigger.collect()

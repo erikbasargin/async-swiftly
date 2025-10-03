@@ -11,8 +11,7 @@ import TestingSupport
 
 struct TestingTaskGroupTests {
 
-    @Test("Given tasks are scheduled at the same time, Then all the tasks are executed in order of enqueueing")
-    func executeTasksInOrderOfEnqueueing() async throws {
+    @Test func `Given tasks are scheduled at the same time, Then all the tasks are executed in order of enqueueing`() async throws {
         let (stream, continuation) = AsyncStream.makeStream(of: Int.self)
         let operations = 0..<100
         
@@ -29,8 +28,7 @@ struct TestingTaskGroupTests {
         await #expect(stream.collect() == Array(operations))
     }
     
-    @Test("Given tasks are scheduled at different times, Then all the tasks are executed in order of scheduling")
-    func executeTasksInOrderOfScheduling() async throws {
+    @Test func `Given tasks are scheduled at different times, Then all the tasks are executed in order of scheduling`() async throws {
         let (stream, continuation) = AsyncStream.makeStream(of: Int.self)
         let source = 0..<100
         
@@ -47,8 +45,7 @@ struct TestingTaskGroupTests {
         await #expect(stream.collect() == Array(source))
     }
     
-    @Test("Given tasks with large time gaps, Then all the tasks are executed in order of scheduling")
-    func executeTasksWithLargeTimeGaps() async throws {
+    @Test func `Given tasks with large time gaps, Then all the tasks are executed in order of scheduling`() async throws {
         let (stream, continuation) = AsyncStream.makeStream(of: Int.self)
         
         try await withTestingTaskGroup { group in
@@ -67,8 +64,8 @@ struct TestingTaskGroupTests {
         
         await #expect(stream.collect() == [1, 2, 3])
     }
-    @Test("Given task suspended by dependency, When another task resolves dependency, Then dependent task resumes its work")
-    func resumeDependentTaskWhenDependencyIsResolved() async throws {
+    
+    @Test func `Given task suspended by dependency, When another task resolves dependency, Then dependent task resumes its work`() async throws {
         let order = AsyncStream.makeStream(of: Int.self)
         let dependency = AsyncStream.makeStream(of: Void.self)
         
@@ -91,8 +88,7 @@ struct TestingTaskGroupTests {
         await #expect(order.stream.collect() == [0, 1, 2, 3])
     }
     
-    @Test("Given task suspended by long running dependency, When group exceeds provided timeout, Then group is cancelled and throws timeout error")
-    func cancelTaskGroupWhenProvidedTimeoutIsExceeded() async throws {
+    @Test func `Given task suspended by long running dependency, When group exceeds provided timeout, Then group is cancelled and throws timeout error`() async throws {
         await #expect(throws: TimeoutError.self) {
             try await withTestingTaskGroup(timeout: 1) { group in
                 group.addTask(at: 0) {
