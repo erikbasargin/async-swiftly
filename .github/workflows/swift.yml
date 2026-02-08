@@ -14,7 +14,7 @@ jobs:
     name: Swift ${{ matrix.swift }} on ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest]
+        os: [macos-26]
         swift: ["6.2.0"]
     runs-on: ${{ matrix.os }}
     steps:
