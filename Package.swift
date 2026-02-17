@@ -14,7 +14,7 @@ var defaultSwiftSettings: [SwiftSetting] {
 let package = Package(
     name: "async-swiftly",
     platforms: [
-        .macOS(.v15),
+        .macOS(.v26),
     ],
     products: [
         .library(
