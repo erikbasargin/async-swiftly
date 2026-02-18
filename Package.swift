@@ -45,6 +45,10 @@ let package = Package(
             swiftSettings: defaultSwiftSettings,
         ),
         .target(
+            name: "ManualClock",
+            swiftSettings: defaultSwiftSettings,
+        ),
+        .target(
             name: "TestingSupport",
             dependencies: [
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
@@ -71,6 +75,14 @@ let package = Package(
             name: "AsyncTriggerTests",
             dependencies: [
                 "AsyncTrigger",
+                "TestingSupport",
+            ],
+            swiftSettings: defaultSwiftSettings,
+        ),
+        .testTarget(
+            name: "ManualClockTests",
+            dependencies: [
+                "ManualClock",
                 "TestingSupport",
             ],
             swiftSettings: defaultSwiftSettings,
