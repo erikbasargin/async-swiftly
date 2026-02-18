@@ -37,7 +37,7 @@ public struct ManualClock: Clock, Sendable {
         var sleepers: [Int: Sleeper] = [:]
     }
 
-    private final class Storage: @unchecked Sendable {
+    private final class Storage: Sendable {
         private let state: OSAllocatedUnfairLock<State>
 
         init(initialInstant: Instant) {
