@@ -1,4 +1,4 @@
-import os
+import Synchronization
 
 public struct ManualClock: Clock, Sendable {
 
@@ -38,10 +38,10 @@ public struct ManualClock: Clock, Sendable {
     }
 
     private final class Storage: Sendable {
-        private let state: OSAllocatedUnfairLock<State>
+        private let state: Mutex<State>
 
         init(initialInstant: Instant) {
-            state = OSAllocatedUnfairLock(initialState: State(now: initialInstant))
+            state = Mutex(State(now: initialInstant))
         }
 
         func now() -> Instant {
@@ -111,7 +111,7 @@ public struct ManualClock: Clock, Sendable {
     }
 
     public func sleep(until deadline: Instant, tolerance: Step? = nil) async throws {
-        let sleepID = OSAllocatedUnfairLock<Int?>(initialState: nil)
+        let sleepID = Mutex<Int?>(nil)
 
         try await withTaskCancellationHandler(operation: {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
