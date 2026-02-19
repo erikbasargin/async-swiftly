@@ -48,7 +48,7 @@ public struct ManualClock: Clock, Sendable {
             state.withLock(\.now)
         }
         
-        func sleep(until deadline: Instant, tolerance: Step?) async throws {
+        func sleep(until deadline: Instant) async throws {
             let (stream, continuation) = AsyncStream.makeStream(of: Never.self)
             
             let id = register(deadline: deadline, continuation: continuation)
@@ -125,7 +125,7 @@ public struct ManualClock: Clock, Sendable {
     }
 
     public func sleep(until deadline: Instant, tolerance: Step? = nil) async throws {
-        try await storage.sleep(until: deadline, tolerance: tolerance)
+        try await storage.sleep(until: deadline)
     }
 
     public func advance(by duration: Step = .step(1)) {
