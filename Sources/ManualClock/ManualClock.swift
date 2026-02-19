@@ -47,8 +47,23 @@ public struct ManualClock: Clock, Sendable {
         func now() -> Instant {
             state.withLock(\.now)
         }
+        
+        func sleep(until deadline: Instant, tolerance: Step?) async throws {
+            let (stream, continuation) = AsyncStream.makeStream(of: Never.self)
+            
+            let id = register(deadline: deadline, continuation: continuation)
+            
+            defer {
+                cancel(id)
+            }
+            
+            var iterator = stream.makeAsyncIterator()
+            _ = await iterator.next()
+            
+            try Task.checkCancellation()
+        }
 
-        func register(deadline: Instant, continuation: AsyncStream<Never>.Continuation) -> Int? {
+        private func register(deadline: Instant, continuation: AsyncStream<Never>.Continuation) -> Int? {
             let idAndReadyContinuation: (Int?, AsyncStream<Never>.Continuation?) = state.withLock {
                 if deadline <= $0.now {
                     return (nil, continuation)
@@ -67,7 +82,7 @@ public struct ManualClock: Clock, Sendable {
             return idAndReadyContinuation.0
         }
 
-        func cancel(_ id: Int?) {
+        private func cancel(_ id: Int?) {
             guard let id else { return }
 
             let _ = state.withLock {
@@ -110,17 +125,7 @@ public struct ManualClock: Clock, Sendable {
     }
 
     public func sleep(until deadline: Instant, tolerance: Step? = nil) async throws {
-        let (stream, continuation) = AsyncStream.makeStream(of: Never.self)
-        
-        let id = storage.register(deadline: deadline, continuation: continuation)
-        
-        defer {
-            storage.cancel(id)
-        }
-        
-        for try await _ in stream {}
-        
-        try Task.checkCancellation()
+        try await storage.sleep(until: deadline, tolerance: tolerance)
     }
 
     public func advance(by duration: Step = .step(1)) {
