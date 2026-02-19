@@ -28,7 +28,7 @@ public struct ManualClock: Clock, Sendable {
 
     private struct Sleeper {
         let deadline: Instant
-        let continuation: CheckedContinuation<Void, any Error>
+        let continuation: AsyncStream<Never>.Continuation
     }
 
     private struct State {
@@ -48,8 +48,8 @@ public struct ManualClock: Clock, Sendable {
             state.withLock(\.now)
         }
 
-        func register(deadline: Instant, continuation: CheckedContinuation<Void, any Error>) -> Int? {
-            let idAndReadyContinuation: (Int?, CheckedContinuation<Void, any Error>?) = state.withLock {
+        func register(deadline: Instant, continuation: AsyncStream<Never>.Continuation) -> Int? {
+            let idAndReadyContinuation: (Int?, AsyncStream<Never>.Continuation?) = state.withLock {
                 if deadline <= $0.now {
                     return (nil, continuation)
                 }
@@ -61,7 +61,7 @@ public struct ManualClock: Clock, Sendable {
             }
 
             if let continuationToResume = idAndReadyContinuation.1 {
-                continuationToResume.resume()
+                continuationToResume.finish()
             }
 
             return idAndReadyContinuation.0
@@ -70,10 +70,9 @@ public struct ManualClock: Clock, Sendable {
         func cancel(_ id: Int?) {
             guard let id else { return }
 
-            let continuation = state.withLock {
+            let _ = state.withLock {
                 $0.sleepers.removeValue(forKey: id)?.continuation
             }
-            continuation?.resume(throwing: CancellationError())
         }
 
         func advance(by duration: Step) {
@@ -82,7 +81,7 @@ public struct ManualClock: Clock, Sendable {
             let continuationsToResume = state.withLock { state in
                 state.now = state.now.advanced(by: duration)
 
-                var dueContinuations: [CheckedContinuation<Void, any Error>] = []
+                var dueContinuations: [AsyncStream<Never>.Continuation] = []
                 for (id, sleeper) in state.sleepers where sleeper.deadline <= state.now {
                     state.sleepers.removeValue(forKey: id)
                     dueContinuations.append(sleeper.continuation)
@@ -91,7 +90,7 @@ public struct ManualClock: Clock, Sendable {
             }
 
             for continuation in continuationsToResume {
-                continuation.resume()
+                continuation.finish()
             }
         }
     }
@@ -111,20 +110,17 @@ public struct ManualClock: Clock, Sendable {
     }
 
     public func sleep(until deadline: Instant, tolerance: Step? = nil) async throws {
-        let sleepID = Mutex<Int?>(nil)
-
-        try await withTaskCancellationHandler(operation: {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-                let id = storage.register(deadline: deadline, continuation: continuation)
-                sleepID.withLock { $0 = id }
-
-                if Task.isCancelled {
-                    storage.cancel(id)
-                }
-            }
-        }, onCancel: {
-            storage.cancel(sleepID.withLock(\.self))
-        })
+        let (stream, continuation) = AsyncStream.makeStream(of: Never.self)
+        
+        let id = storage.register(deadline: deadline, continuation: continuation)
+        
+        defer {
+            storage.cancel(id)
+        }
+        
+        for try await _ in stream {}
+        
+        try Task.checkCancellation()
     }
 
     public func advance(by duration: Step = .step(1)) {
