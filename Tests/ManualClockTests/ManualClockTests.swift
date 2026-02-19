@@ -97,4 +97,41 @@ struct ManualClockTests {
 
         #expect(completed.withLock(\.self) == true)
     }
+
+    @Test func `Sleep throws cancellation error when deadline equals now given task is cancelled`() async throws {
+        let clock = ManualClock()
+        let deadline = clock.now
+
+        let task = Task.immediate {
+            while !Task.isCancelled {
+                await Task.yield()
+            }
+            
+            try await clock.sleep(until: deadline)
+        }
+
+        task.cancel()
+        
+        await #expect(throws: CancellationError.self) {
+            try await task.value
+        }
+    }
+
+    @Test func `Sleep throws cancellation error when deadline is in the past given task is cancelled`() async throws {
+        let clock = ManualClock(initialInstant: .init(when: .step(5)))
+
+        let task = Task.immediate {
+            while !Task.isCancelled {
+                await Task.yield()
+            }
+            
+            try await clock.sleep(until: .init(when: .step(3)))
+        }
+
+        task.cancel()
+        
+        await #expect(throws: CancellationError.self) {
+            try await task.value
+        }
+    }
 }

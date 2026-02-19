@@ -50,6 +50,7 @@ public struct ManualClock: Clock, Sendable {
         
         func sleep(until deadline: Instant) async throws {
             guard let (id, stream) = register(deadline) else {
+                try Task.checkCancellation()
                 return
             }
             
