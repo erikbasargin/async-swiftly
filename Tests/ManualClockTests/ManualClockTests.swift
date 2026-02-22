@@ -2,7 +2,7 @@ import ManualClock
 import Testing
 import Synchronization
 
-struct ManualClockTests {
+@Suite(.timeLimit(.minutes(1))) struct ManualClockTests {
 
     @Test func `Sleep resumes only after sufficient manual advance`() async throws {
         let clock = ManualClock()
@@ -133,5 +133,13 @@ struct ManualClockTests {
         await #expect(throws: CancellationError.self) {
             try await task.value
         }
+    }
+
+    @Test func `Advance to past instant does not move clock backwards`() async throws {
+        let clock = ManualClock(initialInstant: .init(when: .step(5)))
+
+        clock.advance(to: .init(when: .step(3)))
+
+        #expect(clock.now == .init(when: .step(5)))
     }
 }

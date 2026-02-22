@@ -82,8 +82,7 @@ public struct ManualClock: Clock, Sendable {
         }
 
         func advance(by duration: Step) {
-            guard duration > .zero else { return }
-
+            let duration = max(duration, .zero)
             let continuationsToFinish = state.withLock { state in
                 state.now = state.now.advanced(by: duration)
 
