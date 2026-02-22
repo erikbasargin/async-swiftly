@@ -30,6 +30,7 @@ let package = Package(
             name: "AsyncSwiftly",
             dependencies: [
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+                "ManualClock",
             ],
             swiftSettings: defaultSwiftSettings,
         ),

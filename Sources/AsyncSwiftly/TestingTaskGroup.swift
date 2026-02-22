@@ -7,6 +7,7 @@
 
 import os
 import Foundation
+import ManualClock
 
 public struct TimeoutError: LocalizedError {
     public var errorDescription: String? {
@@ -59,23 +60,21 @@ final class SerialTaskExecutor: TaskExecutor, SerialExecutor {
 public struct TestingTaskGroup: ~Copyable {
     
     let queue: WorkQueue
-    let clock: Clock
     var group: ThrowingDiscardingTaskGroup<any Error>
     
     public init(group: ThrowingDiscardingTaskGroup<any Error>) {
         self.queue = WorkQueue()
-        self.clock = Clock(queue: queue)
         self.group = group
     }
     
     public mutating func addTask(at rawStep: Int, operation: sending @escaping @isolated(any) () async -> Void) {
-        let duration = Clock.Step.step(rawStep)
-        let instant = Clock.Instant(when: duration)
+        let duration = ManualClock.Step.step(rawStep)
+        let instant = ManualClock.Instant(when: duration)
         let nextInstant = instant.advanced(by: .step(1))
         let executor = OperationExecutor(instant: nextInstant, queue: queue)
         
-        let shift: () -> Void = { [queue, clock] in
-            var from = clock.now
+        let shift: () -> Void = { [queue] in
+            var from = queue.now
             
             repeat {
                 let step = from
@@ -105,16 +104,12 @@ public struct TestingTaskGroup: ~Copyable {
 
 extension TestingTaskGroup {
     
-    struct Clock {
-        let queue: WorkQueue
-    }
-    
     final class OperationExecutor: TaskExecutor {
         
-        let instant: Clock.Instant
+        let instant: ManualClock.Instant
         let queue: WorkQueue
         
-        init(instant: Clock.Instant, queue: WorkQueue) {
+        init(instant: ManualClock.Instant, queue: WorkQueue) {
             self.instant = instant
             self.queue = queue
         }
@@ -134,24 +129,28 @@ extension TestingTaskGroup {
     
     struct WorkQueue: Sendable {
         
-        typealias Instant = TestingTaskGroup.Clock.Instant
+        typealias Instant = ManualClock.Instant
         typealias Work = @Sendable () -> Void
         
         fileprivate struct State {
-            var now: Instant = .init(when: .zero)
+            let clock = ManualClock()
             var readyToComplete: [Instant: Bool] = [:]
             var scheduledWork: [Instant: TaskQueue] = [:]
+            
+            var now: Instant {
+                clock.now
+            }
         }
         
         var now: Instant {
-            state.withLock(\.now)
+            state.withLock(\.clock.now)
         }
         
         private let state = OSAllocatedUnfairLock(initialState: State())
         
         func advance() {
             state.withLock {
-                $0.now = $0.now.advanced(by: .step(1))
+                $0.clock.advance()
             }
         }
         
@@ -267,90 +266,5 @@ private struct TaskQueue: Sendable, AsyncSequence {
     
     func finish() {
         base.continuation.finish()
-    }
-}
-
-// MARK: - TestingTaskGroup.Clock
-
-extension TestingTaskGroup.Clock: Clock {
-    
-    struct Step: Hashable, CustomStringConvertible {
-        let rawValue: Int
-        
-        static func step(_ amount: Int) -> Self {
-            Step(rawValue: amount)
-        }
-        
-        var description: String {
-            "step \(rawValue)"
-        }
-    }
-    
-    struct Instant: Hashable, CustomStringConvertible {
-        let when: Step
-        
-        var description: String {
-            "tick \(when)"
-        }
-    }
-    
-    var now: Instant {
-        queue.now
-    }
-    
-    var minimumResolution: Step {
-        .step(1)
-    }
-    
-    func sleep(until deadline: Instant, tolerance: Instant.Duration? = nil) async throws {
-        // TODO
-    }
-}
-
-extension TestingTaskGroup.Clock.Step: DurationProtocol {
-    
-    static var zero: Self {
-        .init(rawValue: 0)
-    }
-    
-    static func - (lhs: Self, rhs: Self) -> Self {
-        .init(rawValue: lhs.rawValue - rhs.rawValue)
-    }
-    
-    static func + (lhs: Self, rhs: Self) -> Self {
-        .init(rawValue: lhs.rawValue + rhs.rawValue)
-    }
-    
-    static func < (lhs: Self, rhs: Self) -> Bool {
-        lhs.rawValue < rhs.rawValue
-    }
-    
-    static func / (lhs: Self, rhs: Int) -> Self {
-        .init(rawValue: lhs.rawValue / rhs)
-    }
-    
-    static func * (lhs: Self, rhs: Int) -> Self {
-        .init(rawValue: lhs.rawValue * rhs)
-    }
-
-    static func / (lhs: Self, rhs: Self) -> Double {
-        Double(lhs.rawValue) / Double(rhs.rawValue)
-    }
-}
-
-extension TestingTaskGroup.Clock.Instant: InstantProtocol {
-    
-    typealias Duration = TestingTaskGroup.Clock.Step
-    
-    static func < (lhs: Self, rhs: Self) -> Bool {
-        lhs.when < rhs.when
-    }
-    
-    func advanced(by duration: Duration) -> Self {
-        .init(when: when + duration)
-    }
-
-    func duration(to other: Self) -> Duration {
-        other.when - when
     }
 }
