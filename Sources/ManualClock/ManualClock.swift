@@ -1,5 +1,9 @@
 import Synchronization
 
+/// A manually controlled clock that always increments.
+///
+/// One of the primary uses for `ManualClock` is to control task sleeping.
+/// `ManualClock` advances only when ``advance(by:)`` or ``advance(to:)`` is called.
 public struct ManualClock: Clock, Sendable {
 
     public struct Step: Hashable, CustomStringConvertible {
@@ -124,6 +128,13 @@ public struct ManualClock: Clock, Sendable {
         .step(1)
     }
 
+    /// Suspends until deadline is reached by manual advancement.
+    ///
+    /// If the surrounding task is cancelled while suspended (or already
+    /// cancelled when this method is entered), this method throws
+    /// `CancellationError`.
+    ///
+    /// > Note: Tolerance is currently ignored.
     public func sleep(until deadline: Instant, tolerance: Step? = nil) async throws {
         try await storage.sleep(until: deadline)
     }
