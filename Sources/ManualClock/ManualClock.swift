@@ -36,6 +36,11 @@ public struct ManualClock: Clock, Sendable {
         var nextID: Int = 0
         var sleepers: [Int: Sleeper] = [:]
     }
+    
+    private enum AdvanceKind {
+        case by(Step)
+        case to(Instant)
+    }
 
     private final class Storage: Sendable {
         private let state: Mutex<State>
@@ -81,10 +86,15 @@ public struct ManualClock: Clock, Sendable {
             }
         }
 
-        func advance(by duration: Step) {
-            let duration = max(duration, .zero)
+        func advance(_ kind: AdvanceKind) {
             let continuationsToFinish = state.withLock { state in
-                state.now = state.now.advanced(by: duration)
+                let duration = switch kind {
+                case .by(let duration):
+                    duration
+                case .to(let instant):
+                    state.now.duration(to: instant)
+                }
+                state.now = state.now.advanced(by: max(duration, .zero))
 
                 var dueContinuations: [AsyncStream<Never>.Continuation] = []
                 for (id, sleeper) in state.sleepers where sleeper.deadline <= state.now {
@@ -119,12 +129,11 @@ public struct ManualClock: Clock, Sendable {
     }
 
     public func advance(by duration: Step = .step(1)) {
-        storage.advance(by: duration)
+        storage.advance(.by(duration))
     }
 
     public func advance(to instant: Instant) {
-        let duration = now.duration(to: instant)
-        storage.advance(by: duration)
+        storage.advance(.to(instant))
     }
 }
 

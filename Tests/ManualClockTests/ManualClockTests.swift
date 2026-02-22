@@ -142,4 +142,22 @@ import Synchronization
 
         #expect(clock.now == .init(when: .step(5)))
     }
+
+    @Test func `Concurrent advancing does not overshoot`() async throws {
+        let target = ManualClock.Step.step(5)
+        let clock = ManualClock()
+        
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<8 {
+                group.addTask {
+                    for _ in 0..<300 {
+                        clock.advance(to: .init(when: target))
+                        await Task.yield()
+                    }
+                }
+            }
+        }
+        
+        #expect(clock.now.when == target)
+    }
 }
