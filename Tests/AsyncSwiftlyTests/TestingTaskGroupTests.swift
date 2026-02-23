@@ -112,4 +112,18 @@ struct TestingTaskGroupTests {
             }
         }
     }
+    
+    @Test func `Given empty tasks, Then testing task group completes`() async throws {
+        try await withTestingTaskGroup(timeout: 1) { group in
+            group.addTask(at: 0) {}
+        }
+    }
+    
+    @Test func `Given many tasks with identical delayed step, Then scheduler completes within budget`() async throws {
+        try await withTestingTaskGroup(timeout: 2) { group in
+            for _ in 0..<300 {
+                group.addTask(at: 300) {}
+            }
+        }
+    }
 }
