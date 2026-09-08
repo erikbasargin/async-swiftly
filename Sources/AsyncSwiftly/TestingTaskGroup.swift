@@ -86,7 +86,7 @@ public struct TestingTaskGroup: ~Copyable {
             } while from <= instant
         }
         
-        group.addTask { [queue] in
+        group.addImmediateTask { [queue] in
             shift()
             await withTaskExecutorPreference(executor, operation: operation)
             queue.enqueue(until: nextInstant) {
