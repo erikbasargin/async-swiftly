@@ -1,4 +1,4 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.3
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -8,6 +8,7 @@ var defaultSwiftSettings: [SwiftSetting] {
         .treatAllWarnings(as: .error),
         .enableUpcomingFeature("ExistentialAny"),
         .enableUpcomingFeature("NonisolatedNonsendingBy"),
+        .enableUpcomingFeature("ApproachableConcurrency"),
     ]
 }
 

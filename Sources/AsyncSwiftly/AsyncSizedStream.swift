@@ -55,8 +55,8 @@ extension AsyncSizedStream: AsyncSequence {
         var base: AsyncStream<Element>.Iterator
         let counter: OSAllocatedUnfairLock<Int>
         
-        mutating func next() async -> Element? {
-            switch await base.next() {
+        mutating func next(isolation actor: isolated (any Actor)? = #isolation) async -> Element? {
+            switch await base.next(isolation: actor) {
             case .none:
                 return nil
             case .some(let value):

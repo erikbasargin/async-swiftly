@@ -53,7 +53,7 @@ extension AsyncMaterializedSequence: AsyncSequence {
         var base: Base.AsyncIterator
         
         @usableFromInline
-        private(set) var baseIsCompleted: Bool = false
+        var baseIsCompleted: Bool = false
         
         @inlinable
         init(_ base: Base.AsyncIterator) {
@@ -61,23 +61,21 @@ extension AsyncMaterializedSequence: AsyncSequence {
         }
         
         @inlinable
-        public mutating func next() async -> Event? {
+        public mutating func next(isolation actor: isolated (any Actor)? = #isolation) async throws(Never) -> Event? {
             guard !baseIsCompleted else {
                 return nil
             }
             
             do {
-                if let element = try await base.next() {
+                if let element = try await base.next(isolation: actor) {
                     return .value(element)
                 } else {
                     baseIsCompleted = true
                     return .completed(.finished)
                 }
-            } catch let error as Base.Failure {
+            } catch {
                 baseIsCompleted = true
                 return .completed(.failure(error))
-            } catch {
-                preconditionFailure("Unexpected error: \(error)")
             }
         }
     }

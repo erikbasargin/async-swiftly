@@ -27,7 +27,9 @@ struct AsyncTriggerTests {
     
     @Test func `Trigger consumer resumes when task is cancelled`() async throws {
         let trigger = AsyncTrigger()
-        let work = Task(operation: trigger.callAsFunction)
+        let work = Task {
+            await trigger()
+        }
         
         work.cancel()
         

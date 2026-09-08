@@ -71,10 +71,10 @@ extension AsyncTrigger: AsyncSequence {
         var base: AsyncChannel<Never>.AsyncIterator
         var hasFired: Bool = false
         
-        public mutating func next() async -> AsyncTrigger.Result? {
+        public mutating func next(isolation actor: isolated (any Actor)? = #isolation) async throws(Never) -> AsyncTrigger.Result? {
             guard !hasFired else { return nil }
             
-            _ = await base.next()
+            _ = await base.next(isolation: actor)
             hasFired = true
             return Task.isCancelled ? .cancelled : .triggered
         }

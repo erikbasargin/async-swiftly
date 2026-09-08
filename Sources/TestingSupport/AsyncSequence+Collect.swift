@@ -71,7 +71,11 @@ extension AsyncSequence {
     /// }
     /// ```
     @inlinable package func collect() async rethrows -> [Element]? {
-        let elements = try await reduce(into: []) { $0.append($1) }
+        var elements: [Element] = []
+        for try await element in self {
+            elements.append(element)
+        }
+
         return if elements.isEmpty {
             Task.isCancelled ? nil : []
         } else {
