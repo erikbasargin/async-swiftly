@@ -3,6 +3,13 @@
 
 import PackageDescription
 
+var defaultSwiftSettings: [SwiftSetting] {
+    [
+        .enableUpcomingFeature("ApproachableConcurrency"),
+        .enableUpcomingFeature("ExistentialAny"),
+    ]
+}
+
 let package = Package(
     name: "async-swiftly",
     products: [
@@ -13,11 +20,13 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "AsyncSwiftly"
+            name: "AsyncSwiftly",
+            swiftSettings: defaultSwiftSettings,
         ),
         .testTarget(
             name: "AsyncSwiftlyTests",
-            dependencies: ["AsyncSwiftly"]
+            dependencies: ["AsyncSwiftly"],
+            swiftSettings: defaultSwiftSettings,
         ),
     ]
 )
