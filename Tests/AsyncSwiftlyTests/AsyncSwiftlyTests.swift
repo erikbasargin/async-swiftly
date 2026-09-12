@@ -10,6 +10,7 @@
 //===----------------------------------------------------------------------===//
 
 import Testing
+
 @testable import AsyncSwiftly
 
 @Test func example() async throws {

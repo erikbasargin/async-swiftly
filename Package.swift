@@ -15,8 +15,8 @@ let package = Package(
     products: [
         .library(
             name: "AsyncSwiftly",
-            targets: ["AsyncSwiftly"]
-        ),
+            targets: ["AsyncSwiftly"],
+        )
     ],
     targets: [
         .target(
@@ -28,5 +28,5 @@ let package = Package(
             dependencies: ["AsyncSwiftly"],
             swiftSettings: defaultSwiftSettings,
         ),
-    ]
+    ],
 )
