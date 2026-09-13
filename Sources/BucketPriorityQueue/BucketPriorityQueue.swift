@@ -40,3 +40,5 @@ package struct BucketPriorityQueue<Element> {
         return (bucketIndex, element)
     }
 }
+
+extension BucketPriorityQueue: Sendable where Element: Sendable {}
