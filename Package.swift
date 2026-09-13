@@ -23,9 +23,18 @@ let package = Package(
             name: "AsyncSwiftly",
             swiftSettings: defaultSwiftSettings,
         ),
+        .target(
+            name: "BucketPriorityQueue",
+            swiftSettings: defaultSwiftSettings,
+        ),
         .testTarget(
             name: "AsyncSwiftlyTests",
             dependencies: ["AsyncSwiftly"],
+            swiftSettings: defaultSwiftSettings,
+        ),
+        .testTarget(
+            name: "BucketPriorityQueueTests",
+            dependencies: ["BucketPriorityQueue"],
             swiftSettings: defaultSwiftSettings,
         ),
     ],
