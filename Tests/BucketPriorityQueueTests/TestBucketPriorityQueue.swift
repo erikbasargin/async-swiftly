@@ -75,4 +75,25 @@ struct TestBucketPriorityQueue {
         #expect(queue.isEmpty == true)
         #expect(queue.popFirst() == nil)
     }
+    
+    @Test func `Buckets are processed in order that they are added`() throws {
+        var queue = BucketPriorityQueue<Int>()
+        let firstBucketIndex = queue.appendBucket()
+        let secondBucketIndex = queue.appendBucket()
+        
+        queue.append(2, to: secondBucketIndex)
+        queue.append(1, to: firstBucketIndex)
+        
+        var result: [(Int, Int)] = []
+        
+        while let popped = queue.popFirst() {
+            result.append(popped)
+        }
+        
+        #expect(result.count == 2)
+        #expect(try #require(result.first) == (firstBucketIndex, 1))
+        #expect(try #require(result.last) == (secondBucketIndex, 2))
+        #expect(queue.isEmpty == true)
+        #expect(queue.popFirst() == nil)
+    }
 }

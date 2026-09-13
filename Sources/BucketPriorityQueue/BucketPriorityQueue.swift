@@ -31,10 +31,12 @@ package struct BucketPriorityQueue<Element> {
     }
     
     package mutating func popFirst() -> (bucketIndex: Int, element: Element)? {
-        guard let bucketIndex = buckets.firstIndex(where: { _ in true }), let element = buckets[bucketIndex].popFirst()
-        else {
+        guard let bucketIndex = buckets.firstIndex(where: { !$0.isEmpty }) else {
             return nil
         }
-        return (0, element)
+        guard let element = buckets[bucketIndex].popFirst() else {
+            return nil
+        }
+        return (bucketIndex, element)
     }
 }
