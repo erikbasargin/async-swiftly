@@ -18,6 +18,9 @@ let package = Package(
             targets: ["AsyncSwiftly"],
         )
     ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-collections.git", from: "1.6.0")
+    ],
     targets: [
         .target(
             name: "AsyncSwiftly",
@@ -25,6 +28,9 @@ let package = Package(
         ),
         .target(
             name: "BucketPriorityQueue",
+            dependencies: [
+                .product(name: "DequeModule", package: "swift-collections")
+            ],
             swiftSettings: defaultSwiftSettings,
         ),
         .testTarget(
