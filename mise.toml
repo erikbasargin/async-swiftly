@@ -2,3 +2,6 @@
 description = "Run Muter with the Swiftly toolchain pinned in .swift-version"
 dir = "{{config_root}}"
 run = "python3 scripts/muter.py"
+
+[tasks.lint]
+run = "swiftly run swift format . --recursive --in-place"
