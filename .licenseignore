@@ -1,4 +1,6 @@
 Package.swift
+Package.resolved
 LICENSE
 .swift-version
 mise.toml
+.editorconfig
