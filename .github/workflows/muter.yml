@@ -1,0 +1,141 @@
+name: Muter
+run-name: 'Muter for PR #${{ github.event.issue.number }}'
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  request:
+    name: Validate request
+    if: >-
+      github.event.issue.pull_request &&
+      github.event.comment.body == '/muter run' &&
+      github.event.comment.user.type == 'User'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    outputs:
+      sha: ${{ steps.request.outputs.sha }}
+      comment_id: ${{ steps.request.outputs.comment_id }}
+    steps:
+      # This job never checks out or executes PR code.
+      - name: Authorize and acknowledge command
+        id: request
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const { comment, issue } = context.payload;
+            const { data: access } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner, repo, username: comment.user.login,
+            });
+            if (!['write', 'maintain', 'admin'].includes(access.permission)) {
+              core.notice('Only users with repository write access can run Muter.');
+              return;
+            }
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner, repo, pull_number: issue.number,
+            });
+            if (pr.state !== 'open') {
+              core.notice('Muter runs only on open pull requests.');
+              return;
+            }
+
+            const runURL = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const { data: reply } = await github.rest.issues.createComment({
+              owner, repo, issue_number: issue.number,
+              body: [
+                `### Muter: queued`,
+                `Requested by [this comment](${comment.html_url}).`,
+                `Commit: \`${pr.head.sha}\``,
+                `[Workflow run](${runURL})`,
+                'This comment will be updated with the run status. Reports and logs will be available in the workflow artifacts.',
+              ].join('\n\n'),
+            });
+            core.setOutput('sha', pr.head.sha);
+            core.setOutput('comment_id', reply.id);
+
+  muter:
+    name: Run mutation tests
+    needs: request
+    if: needs.request.outputs.sha != ''
+    runs-on: macos-15
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - name: Check out requested PR commit
+        uses: actions/checkout@v4
+        with:
+          # Resolve once in the trusted job, including for fork PRs.
+          ref: ${{ needs.request.outputs.sha }}
+          persist-credentials: false
+
+      - name: Install Muter, Swiftly, and mise
+        run: brew install muter-mutation-testing/formulae/muter swiftly mise
+
+      - name: Install the pinned Swift toolchain
+        run: |
+          swiftly init --skip-install --no-modify-profile --assume-yes
+          . "$HOME/.swiftly/env.sh"
+          swiftly install --assume-yes
+          swiftly run swift --version
+          echo "$SWIFTLY_BIN_DIR" >> "$GITHUB_PATH"
+
+      - name: Run Muter
+        timeout-minutes: 60
+        env:
+          REPORT_DIR: ${{ runner.temp }}/muter-results
+          MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+        run: |
+          mkdir -p "$REPORT_DIR"
+          set -o pipefail
+          mise run muter -- --format plain \
+            --output "$REPORT_DIR/muter-report.txt" 2>&1 | tee "$REPORT_DIR/muter.log"
+          test -s "$REPORT_DIR/muter-report.txt"
+
+      - name: Upload report and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: muter-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/muter-results/muter-report.txt
+            ${{ runner.temp }}/muter-results/muter.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  report:
+    name: Update result comment
+    needs: [request, muter]
+    if: always() && needs.request.outputs.comment_id != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      # A fresh runner keeps the write token separate from all PR execution.
+      - name: Update the bot's response
+        uses: actions/github-script@v8
+        env:
+          COMMENT_ID: ${{ needs.request.outputs.comment_id }}
+          TESTED_SHA: ${{ needs.request.outputs.sha }}
+          MUTER_RESULT: ${{ needs.muter.result }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const runURL = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.updateComment({
+              owner, repo, comment_id: Number(process.env.COMMENT_ID),
+              body: [
+                `### Muter: ${process.env.MUTER_RESULT}`,
+                `Requested by [this comment](${context.payload.comment.html_url}).`,
+                `Commit: \`${process.env.TESTED_SHA}\``,
+                `[View workflow logs and download report artifacts](${runURL})`,
+              ].join('\n\n'),
+            });
