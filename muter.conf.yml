@@ -1,7 +1,7 @@
 arguments:
-- test
+  - test
 executable: /usr/bin/swift
 exclude:
-- Package.swift
+  - Package.swift
 excludeCalls: []
 testSuiteTimeout: 60
