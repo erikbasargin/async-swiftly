@@ -8,3 +8,33 @@
 // See LICENSE for license information
 //
 //===----------------------------------------------------------------------===//
+
+import DequeModule
+
+package struct BucketPriorityQueue<Element> {
+    
+    package private(set) var buckets: [Deque<Element>] = []
+    
+    package var isEmpty: Bool {
+        buckets.first(where: { !$0.isEmpty }) == nil
+    }
+    
+    package init() {}
+    
+    package mutating func appendBucket() -> Int {
+        buckets.append(Deque())
+        return buckets.count - 1
+    }
+    
+    package mutating func append(_ element: Element, to bucketIndex: Int) {
+        buckets[bucketIndex].append(element)
+    }
+    
+    package mutating func popFirst() -> (bucketIndex: Int, element: Element)? {
+        guard let bucketIndex = buckets.firstIndex(where: { _ in true }), let element = buckets[bucketIndex].popFirst()
+        else {
+            return nil
+        }
+        return (0, element)
+    }
+}
