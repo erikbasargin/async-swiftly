@@ -9,11 +9,28 @@
 //
 //===----------------------------------------------------------------------===//
 
-public func withTestTaskGroup(body: (isolated TestActor) -> Void) async throws {
+public func withTestTaskGroup(body: @Sendable (isolated TestActor, inout TestTaskGroup) -> Void) async throws {
     let actor = TestActor()
-    await body(actor)
+    try await actor.run(body: body)
 }
 
 public actor TestActor {
     
+    func run(body: @Sendable (isolated TestActor, inout TestTaskGroup) -> Void) async throws {
+        try await withThrowingDiscardingTaskGroup { group in
+            var testGroup = TestTaskGroup(base: group)
+            body(self, &testGroup)
+        }
+    }
+}
+
+public struct TestTaskGroup {
+    
+    var base: ThrowingDiscardingTaskGroup<any Error>
+    
+    package mutating func addTask(@_inheritActorContext(always) operation: sending @escaping () async -> Void) {
+        base.addTask {
+            await operation()
+        }
+    }
 }
