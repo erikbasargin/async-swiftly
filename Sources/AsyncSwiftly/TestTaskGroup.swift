@@ -9,4 +9,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-public func withTestTaskGroup(body: () -> Void) {}
+public func withTestTaskGroup(body: (isolated TestActor) -> Void) async throws {
+    let actor = TestActor()
+    await body(actor)
+}
+
+public actor TestActor {
+    
+}
