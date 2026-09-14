@@ -15,6 +15,8 @@ import Testing
 struct TestTaskGroupTests {
     
     @Test func `Empty registration completes`() async throws {
-        try await withTestTaskGroup {}
+        try await withTestTaskGroup { actor in
+            #expect(#isolation === actor)
+        }
     }
 }
