@@ -8,3 +8,13 @@
 // See LICENSE for license information
 //
 //===----------------------------------------------------------------------===//
+
+import AsyncSwiftly
+import Testing
+
+struct TestTaskGroupTests {
+    
+    @Test func `Empty registration completes`() async throws {
+        try await withTestTaskGroup {}
+    }
+}
