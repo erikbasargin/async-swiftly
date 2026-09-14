@@ -17,13 +17,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      pull-requests: write
+      pull-requests: read
+      checks: write
     outputs:
       sha: ${{ steps.request.outputs.sha }}
-      comment_id: ${{ steps.request.outputs.comment_id }}
+      check_id: ${{ steps.request.outputs.check_id }}
     steps:
       # This job never checks out or executes PR code.
-      - name: Authorize and acknowledge command
+      - name: Authorize command and create PR check
         id: request
         uses: actions/github-script@v8
         with:
@@ -47,18 +48,17 @@ jobs:
             }
 
             const runURL = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
-            const { data: reply } = await github.rest.issues.createComment({
-              owner, repo, issue_number: issue.number,
-              body: [
-                `### Muter: queued`,
-                `Requested by [this comment](${comment.html_url}).`,
-                `Commit: \`${pr.head.sha}\``,
-                `[Workflow run](${runURL})`,
-                'This comment will be updated with the run status. Reports and logs will be available in the workflow artifacts.',
-              ].join('\n\n'),
+            const { data: check } = await github.rest.checks.create({
+              owner, repo, name: 'Muter', head_sha: pr.head.sha,
+              status: 'in_progress', started_at: new Date().toISOString(),
+              details_url: runURL,
+              output: {
+                title: 'Mutation testing requested',
+                summary: `Requested by [this comment](${comment.html_url}). [Workflow run](${runURL}).`,
+              },
             });
             core.setOutput('sha', pr.head.sha);
-            core.setOutput('comment_id', reply.id);
+            core.setOutput('check_id', check.id);
 
   muter:
     name: Run mutation tests
@@ -111,31 +111,55 @@ jobs:
           retention-days: 14
 
   report:
-    name: Update result comment
+    name: Publish Muter results
     needs: [request, muter]
-    if: always() && needs.request.outputs.comment_id != ''
+    if: always() && needs.request.outputs.check_id != ''
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      actions: read
+      checks: write
       pull-requests: write
     steps:
       # A fresh runner keeps the write token separate from all PR execution.
-      - name: Update the bot's response
+      - name: Complete PR check
         uses: actions/github-script@v8
         env:
-          COMMENT_ID: ${{ needs.request.outputs.comment_id }}
-          TESTED_SHA: ${{ needs.request.outputs.sha }}
+          CHECK_ID: ${{ needs.request.outputs.check_id }}
           MUTER_RESULT: ${{ needs.muter.result }}
         with:
           script: |
             const { owner, repo } = context.repo;
             const runURL = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
-            await github.rest.issues.updateComment({
-              owner, repo, comment_id: Number(process.env.COMMENT_ID),
-              body: [
-                `### Muter: ${process.env.MUTER_RESULT}`,
-                `Requested by [this comment](${context.payload.comment.html_url}).`,
-                `Commit: \`${process.env.TESTED_SHA}\``,
-                `[View workflow logs and download report artifacts](${runURL})`,
-              ].join('\n\n'),
+            await github.rest.checks.update({
+              owner, repo, check_run_id: Number(process.env.CHECK_ID),
+              status: 'completed', conclusion: process.env.MUTER_RESULT,
+              completed_at: new Date().toISOString(), details_url: runURL,
+              output: {
+                title: `Muter: ${process.env.MUTER_RESULT}`,
+                summary: `[View workflow logs and download report artifacts](${runURL}). A successful run does not enforce a minimum mutation score.`,
+              },
             });
+
+      - name: Download report
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: muter-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/muter-results
+
+      - name: Comment with mutation report
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          MUTER_RESULT: ${{ needs.muter.result }}
+          REPORT_FILE: ${{ runner.temp }}/muter-results/muter-report.txt
+        run: |
+          if [ -s "$REPORT_FILE" ]; then
+            gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$REPORT_FILE"
+          else
+            gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+              --body "Muter: $MUTER_RESULT. No report was produced. See the [workflow logs]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)."
+          fi
