@@ -29,7 +29,7 @@ public struct TestTaskGroup {
     var base: ThrowingDiscardingTaskGroup<any Error>
     
     package mutating func addTask(@_inheritActorContext(always) operation: sending @escaping () async -> Void) {
-        base.addTask {
+        _ = base.addTaskUnlessCancelled {
             await operation()
         }
     }

@@ -9,6 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Synchronization
 import AsyncSwiftly
 import Testing
 
@@ -29,4 +30,26 @@ struct TestTaskGroupTests {
             }
         }
     }
+    
+    @Test func `Operations are skipped if scope is cancelled`() async throws {
+        let events = Events<Int>()
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            try await withTestTaskGroup { _, group in
+                for id in 0..<10 {
+                    group.addTask {
+                        events.append(id)
+                    }
+                }
+            }
+        }
+        try await task.value
+        #expect(events.values.isEmpty == true)
+    }
+}
+
+private final class Events<Value: Sendable>: Sendable {
+    private let state = Mutex<[Value]>([])
+    var values: [Value] { state.withLock { $0 } }
+    func append(_ value: Value) { state.withLock { $0.append(value) } }
 }
