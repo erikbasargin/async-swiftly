@@ -15,8 +15,18 @@ import Testing
 struct TestTaskGroupTests {
     
     @Test func `Empty registration completes`() async throws {
-        try await withTestTaskGroup { actor in
+        try await withTestTaskGroup { actor, _ in
             #expect(#isolation === actor)
+        }
+    }
+    
+    @Test func `Operation inherits group isolation`() async throws {
+        await #expect(processExitsWith: .success) {
+            try await withTestTaskGroup { actor, group in
+                group.addTask {
+                    actor.assertIsolated()
+                }
+            }
         }
     }
 }
