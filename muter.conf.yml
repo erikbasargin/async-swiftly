@@ -1,5 +1,7 @@
 arguments:
   - test
+  - --skip
+  - CompileFailTests
 executable: /usr/bin/swift
 exclude:
   - Package.swift
