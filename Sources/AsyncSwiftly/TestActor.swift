@@ -9,7 +9,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Foundation
+
 public actor TestActor {
+    
+    nonisolated public struct TimeoutError: Error {}
     
     private enum LaneState {
         case pending(CheckedContinuation<Void, Never>?)
@@ -30,9 +34,18 @@ public actor TestActor {
     private var executors: [OperationExecutor] = []
     private var laneStates: [LaneState] = []
     
-    func run(body: @Sendable (isolated TestActor, inout TestTaskGroup) -> Void) async throws {
+    func run(
+        timeout seconds: TimeInterval,
+        body: @Sendable (isolated TestActor, inout TestTaskGroup) -> Void,
+    ) async throws {
         try await withThrowingDiscardingTaskGroup { group in
             var testGroup = TestTaskGroup(testActor: self, base: group)
+            if seconds.isFinite {
+                group.addTask {
+                    try? await Task.sleep(for: .seconds(seconds))
+                    throw TimeoutError()
+                }
+            }
             body(self, &testGroup)
             await drain()
         }
