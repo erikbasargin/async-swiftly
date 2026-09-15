@@ -108,7 +108,7 @@ struct TestTaskGroupTests {
         }
         
         let task = Task {
-            try await withTestTaskGroup(timeout: 10) { _, group in
+            try await withTestTaskGroup { _, group in
                 group.addTask { _ in
                     started.continuation.yield()
                     do {
