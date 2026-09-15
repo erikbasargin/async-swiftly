@@ -64,7 +64,7 @@ jobs:
     name: Run mutation tests
     needs: request
     if: needs.request.outputs.sha != ''
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 90
     permissions:
       contents: read
@@ -75,6 +75,11 @@ jobs:
           # Resolve once in the trusted job, including for fork PRs.
           ref: ${{ needs.request.outputs.sha }}
           persist-credentials: false
+
+      - name: Show Apple toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk macosx --show-sdk-version
 
       - name: Install Muter, Swiftly, and mise
         run: brew install muter-mutation-testing/formulae/muter swiftly mise
