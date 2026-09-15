@@ -28,6 +28,9 @@ let package = Package(
     targets: [
         .target(
             name: "AsyncSwiftly",
+            dependencies: [
+                "BucketPriorityQueue"
+            ],
             swiftSettings: defaultSwiftSettings,
         ),
         .target(
