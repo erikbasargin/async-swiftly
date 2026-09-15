@@ -9,8 +9,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Synchronization
 import AsyncSwiftly
+import Synchronization
 import Testing
 
 struct TestTaskGroupTests {

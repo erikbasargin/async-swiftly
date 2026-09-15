@@ -24,7 +24,7 @@ public actor TestActor {
     }
 }
 
-public struct TestTaskGroup {
+public struct TestTaskGroup: ~Copyable {
     
     let testActor: TestActor
     var base: ThrowingDiscardingTaskGroup<any Error>
