@@ -46,6 +46,21 @@ struct TestTaskGroupTests {
         try await task.value
         #expect(events.values.isEmpty == true)
     }
+    
+    @Test func `Operations are executed in order of enqueueing`() async throws {
+        let events = Events<Int>()
+        let operations = 0..<100
+        
+        try await withTestTaskGroup { _, group in
+            for id in operations {
+                group.addTask { _ in
+                    events.append(id)
+                }
+            }
+        }
+        
+        #expect(events.values == Array(operations))
+    }
 }
 
 private final class Events<Value: Sendable>: Sendable {

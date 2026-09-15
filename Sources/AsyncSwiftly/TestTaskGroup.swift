@@ -30,7 +30,7 @@ public struct TestTaskGroup {
     var base: ThrowingDiscardingTaskGroup<any Error>
     
     package mutating func addTask(operation: @escaping @Sendable (isolated TestActor) async -> Void) {
-        _ = base.addTaskUnlessCancelled { [testActor] in
+        _ = base.addImmediateTaskUnlessCancelled { [testActor] in
             await operation(testActor)
         }
     }
