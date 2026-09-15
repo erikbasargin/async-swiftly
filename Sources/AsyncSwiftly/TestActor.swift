@@ -35,7 +35,7 @@ public actor TestActor {
     private var laneStates: [LaneState] = []
     
     func run(
-        timeout seconds: TimeInterval,
+        timeout seconds: TimeInterval = 5,
         body: @Sendable (isolated TestActor, inout TestTaskGroup) -> Void,
     ) async throws {
         try await withThrowingDiscardingTaskGroup { group in
@@ -53,6 +53,9 @@ public actor TestActor {
             }
             body(self, &testGroup)
             await drain()
+            
+            // User operations are finished; only the watchdog can remain.
+            group.cancelAll()
         }
     }
     
