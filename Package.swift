@@ -22,7 +22,8 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-collections.git", from: "1.6.0")
+        .package(url: "https://github.com/apple/swift-collections.git", from: "1.6.0"),
+        .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "1.0.0"),
     ],
     targets: [
         .target(
@@ -38,7 +39,10 @@ let package = Package(
         ),
         .testTarget(
             name: "AsyncSwiftlyTests",
-            dependencies: ["AsyncSwiftly"],
+            dependencies: [
+                "AsyncSwiftly",
+                .product(name: "Subprocess", package: "swift-subprocess"),
+            ],
             swiftSettings: defaultSwiftSettings,
         ),
         .testTarget(
