@@ -8,3 +8,10 @@
 // See LICENSE for license information
 //
 //===----------------------------------------------------------------------===//
+
+import AsyncSwiftly
+
+struct CopyableGroup: Copyable {
+    // expected-error@+1 {{stored property 'group' of 'Copyable'-conforming struct 'CopyableGroup' has non-Copyable type 'TestTaskGroup'}}
+    var group: TestTaskGroup
+}

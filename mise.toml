@@ -4,4 +4,7 @@ dir = "{{config_root}}"
 run = "python3 scripts/muter.py"
 
 [tasks.lint]
-run = "swiftly run swift format . --recursive --in-place"
+run = [
+    "swiftly run swift format . --recursive --in-place",
+    "swiftly run swift format lint . --recursive --strict",
+]

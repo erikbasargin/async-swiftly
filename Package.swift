@@ -12,6 +12,9 @@ var defaultSwiftSettings: [SwiftSetting] {
 
 let package = Package(
     name: "async-swiftly",
+    platforms: [
+        .macOS(.v26)
+    ],
     products: [
         .library(
             name: "AsyncSwiftly",
@@ -19,11 +22,15 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-collections.git", from: "1.6.0")
+        .package(url: "https://github.com/apple/swift-collections.git", from: "1.6.0"),
+        .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "1.0.0"),
     ],
     targets: [
         .target(
             name: "AsyncSwiftly",
+            dependencies: [
+                "BucketPriorityQueue"
+            ],
             swiftSettings: defaultSwiftSettings,
         ),
         .target(
@@ -35,7 +42,11 @@ let package = Package(
         ),
         .testTarget(
             name: "AsyncSwiftlyTests",
-            dependencies: ["AsyncSwiftly"],
+            dependencies: [
+                "AsyncSwiftly",
+                .product(name: "Subprocess", package: "swift-subprocess"),
+            ],
+            resources: [.copy("Fixtures")],
             swiftSettings: defaultSwiftSettings,
         ),
         .testTarget(
