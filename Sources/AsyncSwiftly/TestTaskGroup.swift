@@ -18,7 +18,7 @@ public actor TestActor {
     
     func run(body: @Sendable (isolated TestActor, inout TestTaskGroup) -> Void) async throws {
         try await withThrowingDiscardingTaskGroup { group in
-            var testGroup = TestTaskGroup(base: group)
+            var testGroup = TestTaskGroup(testActor: self, base: group)
             body(self, &testGroup)
         }
     }
@@ -26,11 +26,12 @@ public actor TestActor {
 
 public struct TestTaskGroup {
     
+    let testActor: TestActor
     var base: ThrowingDiscardingTaskGroup<any Error>
     
-    package mutating func addTask(@_inheritActorContext(always) operation: sending @escaping () async -> Void) {
-        _ = base.addTaskUnlessCancelled {
-            await operation()
+    package mutating func addTask(operation: @escaping @Sendable (isolated TestActor) async -> Void) {
+        _ = base.addTaskUnlessCancelled { [testActor] in
+            await operation(testActor)
         }
     }
 }

@@ -24,7 +24,7 @@ struct TestTaskGroupTests {
     @Test func `Operation inherits group isolation`() async throws {
         await #expect(processExitsWith: .success) {
             try await withTestTaskGroup { actor, group in
-                group.addTask {
+                group.addTask { _ in
                     actor.assertIsolated()
                 }
             }
@@ -37,7 +37,7 @@ struct TestTaskGroupTests {
             withUnsafeCurrentTask { $0?.cancel() }
             try await withTestTaskGroup { _, group in
                 for id in 0..<10 {
-                    group.addTask {
+                    group.addTask { _ in
                         events.append(id)
                     }
                 }
