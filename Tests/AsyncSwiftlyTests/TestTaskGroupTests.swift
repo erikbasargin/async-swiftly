@@ -22,11 +22,9 @@ struct TestTaskGroupTests {
     }
     
     @Test func `Operation inherits group isolation`() async throws {
-        await #expect(processExitsWith: .success) {
-            try await withTestTaskGroup { actor, group in
-                group.addTask { _ in
-                    actor.assertIsolated()
-                }
+        try await withTestTaskGroup { actor, group in
+            group.addTask { _ in
+                #expect(#isolation === actor)
             }
         }
     }
