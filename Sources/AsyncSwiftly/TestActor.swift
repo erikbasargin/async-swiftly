@@ -42,7 +42,12 @@ public actor TestActor {
             var testGroup = TestTaskGroup(testActor: self, base: group)
             if seconds.isFinite {
                 group.addTask {
-                    try? await Task.sleep(for: .seconds(seconds))
+                    do {
+                        try await Task.sleep(for: .seconds(seconds))
+                    } catch is CancellationError {
+                        return
+                    }
+                    
                     throw TimeoutError()
                 }
             }

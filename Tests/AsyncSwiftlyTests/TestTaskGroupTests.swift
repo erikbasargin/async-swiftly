@@ -99,6 +99,38 @@ struct TestTaskGroupTests {
         
         #expect(events.values == ["cleanup"])
     }
+    
+    @Test func `Scope cancellation drains remaining operations given timeout is set`() async throws {
+        let events = Events<String>()
+        let started = AsyncStream.makeStream(of: Void.self)
+        defer {
+            started.continuation.finish()
+        }
+        
+        let task = Task {
+            try await withTestTaskGroup(timeout: 10) { _, group in
+                group.addTask { _ in
+                    started.continuation.yield()
+                    do {
+                        try await Task.sleep(for: .seconds(60))
+                    } catch is CancellationError {
+                        await Task.yield()
+                        events.append("cleanup")
+                    } catch {
+                        Issue.record(error)
+                    }
+                }
+            }
+        }
+        
+        _ = await started.stream.first(where: { _ in true })
+        
+        task.cancel()
+        
+        _ = try await task.value
+        
+        #expect(events.values == ["cleanup"])
+    }
 }
 
 private final class Events<Value: Sendable>: Sendable {
