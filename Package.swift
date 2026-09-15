@@ -43,6 +43,7 @@ let package = Package(
                 "AsyncSwiftly",
                 .product(name: "Subprocess", package: "swift-subprocess"),
             ],
+            resources: [.copy("Fixtures")],
             swiftSettings: defaultSwiftSettings,
         ),
         .testTarget(
