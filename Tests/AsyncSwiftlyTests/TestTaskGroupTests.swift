@@ -77,6 +77,28 @@ struct TestTaskGroupTests {
         
         #expect(events.values == Array(0...100))
     }
+    
+    @Test func `Group times out and drains remaining operations`() async {
+        let events = Events<String>()
+        
+        await #expect(throws: TestActor.TimeoutError.self) {
+            try await withTestTaskGroup(timeout: 0.05) { _, group in
+                group.addTask { _ in
+                    do {
+                        try await Task.sleep(for: .seconds(60))
+                        Issue.record("Sleep should have been cancelled")
+                    } catch is CancellationError {
+                        await Task.yield()
+                        events.append("cleanup")
+                    } catch {
+                        Issue.record(error)
+                    }
+                }
+            }
+        }
+        
+        #expect(events.values == ["cleanup"])
+    }
 }
 
 private final class Events<Value: Sendable>: Sendable {

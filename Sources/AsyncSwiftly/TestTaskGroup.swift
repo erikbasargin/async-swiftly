@@ -9,9 +9,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-public func withTestTaskGroup(body: @Sendable (isolated TestActor, inout TestTaskGroup) -> Void) async throws {
+import Foundation
+
+public func withTestTaskGroup(
+    timeout seconds: TimeInterval = .infinity,
+    body: @Sendable (isolated TestActor, inout TestTaskGroup) -> Void,
+) async throws {
     let actor = TestActor()
-    try await actor.run(body: body)
+    try await actor.run(timeout: seconds, body: body)
 }
 
 public struct TestTaskGroup: ~Copyable {
