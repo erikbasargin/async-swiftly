@@ -45,7 +45,7 @@ struct TestTaskGroupTests {
         #expect(events.values.isEmpty == true)
     }
     
-    @Test func `Operations are executed in order of enqueueing`() async throws {
+    @Test func `Synchronous operations are executed in order of enqueueing`() async throws {
         let events = Events<Int>()
         let operations = 0..<100
         
@@ -58,6 +58,24 @@ struct TestTaskGroupTests {
         }
         
         #expect(events.values == Array(operations))
+    }
+    
+    @Test func `Concurrent operations are executed in order of enqueueing`() async throws {
+        let events = Events<Int>()
+        
+        try await withTestTaskGroup { _, group in
+            group.addTask { _ in
+                for id in 0..<100 {
+                    events.append(id)
+                    await Task.yield()
+                }
+            }
+            group.addTask { _ in
+                events.append(100)
+            }
+        }
+        
+        #expect(events.values == Array(0...100))
     }
 }
 

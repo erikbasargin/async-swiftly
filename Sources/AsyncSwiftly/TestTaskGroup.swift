@@ -14,24 +14,17 @@ public func withTestTaskGroup(body: @Sendable (isolated TestActor, inout TestTas
     try await actor.run(body: body)
 }
 
-public actor TestActor {
-    
-    func run(body: @Sendable (isolated TestActor, inout TestTaskGroup) -> Void) async throws {
-        try await withThrowingDiscardingTaskGroup { group in
-            var testGroup = TestTaskGroup(testActor: self, base: group)
-            body(self, &testGroup)
-        }
-    }
-}
-
 public struct TestTaskGroup: ~Copyable {
     
     let testActor: TestActor
     var base: ThrowingDiscardingTaskGroup<any Error>
     
     package mutating func addTask(operation: @escaping @Sendable (isolated TestActor) async -> Void) {
-        _ = base.addImmediateTaskUnlessCancelled { [testActor] in
-            await operation(testActor)
+        let laneID = testActor.assumeIsolated { actor in
+            actor.registerLane()
+        }
+        base.addTask { [testActor] in
+            await testActor.runLane(id: laneID, operation: operation)
         }
     }
 }
