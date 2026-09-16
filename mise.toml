@@ -1,7 +1,7 @@
 [tasks.muter]
 description = "Run Muter with the Swiftly toolchain pinned in .swift-version"
 dir = "{{config_root}}"
-run = "python3 scripts/muter.py"
+run = "python3 scripts/muter.py --operators RelationalOperatorReplacement ChangeLogicalConnector SwapTernary"
 
 [tasks.lint]
 run = [
