@@ -1,4 +1,4 @@
-name: Pull request
+name: CI
 
 permissions:
   contents: read
@@ -6,6 +6,8 @@ permissions:
 on:
   pull_request:
     types: [opened, reopened, synchronize]
+  push:
+    branches: [main]
 
 jobs:
   tests:
