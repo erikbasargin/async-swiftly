@@ -42,6 +42,7 @@ jobs:
           xcrun llvm-cov export \
             -format=lcov \
             -instr-profile=.build/debug/codecov/default.profdata \
+            -ignore-filename-regex='/(Tests|\.build)/' \
             "${objects[@]}" \
             > coverage.lcov
 
