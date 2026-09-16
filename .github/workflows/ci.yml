@@ -17,6 +17,17 @@ jobs:
       license_header_check_project_name: "async-swiftly"
       api_breakage_check_enabled: false
 
+  macos_checks:
+    name: macOS Checks
+    runs-on: xcode-27
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: Swift version
+        run: xcrun swift --version
+      - name: Build and test
+        run: xcrun swift test
+
   linux_checks:
     name: Linux Checks
     uses: swiftlang/github-workflows/.github/workflows/swift_package_test.yml@0.0.15
