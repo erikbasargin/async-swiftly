@@ -10,16 +10,23 @@ on:
     branches: [main]
 
 jobs:
-  tests:
-    name: Test
-    uses: swiftlang/github-workflows/.github/workflows/swift_package_test.yml@0.0.15
-    with:
-      linux_swift_versions: "[\"nightly-6.4.x\"]"
-      windows_swift_versions: "[\"nightly-6.4.x\"]"
-
   soundness:
     name: Soundness
     uses: swiftlang/github-workflows/.github/workflows/soundness.yml@0.0.15
     with:
       license_header_check_project_name: "async-swiftly"
       api_breakage_check_enabled: false
+
+  linux_checks:
+    name: Linux Checks
+    uses: swiftlang/github-workflows/.github/workflows/swift_package_test.yml@0.0.15
+    with:
+      enable_windows_checks: false
+      linux_swift_versions: "[\"nightly-6.4.x\"]"
+
+  windows_checks:
+    name: Windows Checks
+    uses: swiftlang/github-workflows/.github/workflows/swift_package_test.yml@0.0.15
+    with:
+      enable_linux_checks: false
+      windows_swift_versions: "[\"nightly-6.4.x\"]"
