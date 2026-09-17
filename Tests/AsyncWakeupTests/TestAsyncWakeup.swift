@@ -14,7 +14,7 @@ import Testing
 
 struct TestAsyncWakeup {
     
-    @Test func `Wakeup is resumed when scope is cancelled`() async {
+    @Test func `Wait returns cancelled when waiting task is cancelled`() async {
         let wakeup = AsyncWakeup()
         let task = Task.immediate {
             await wakeup.wait()
@@ -25,7 +25,7 @@ struct TestAsyncWakeup {
         #expect(await task.value == .cancelled)
     }
     
-    @Test func `Wakeup is resumed when task is already cancelled`() async throws {
+    @Test func `Wait returns cancelled when task was already cancelled`() async throws {
         let wakeup = AsyncWakeup()
         let task = Task {
             try withUnsafeCurrentTask { currentTask in 
@@ -38,7 +38,7 @@ struct TestAsyncWakeup {
         #expect(try await task.value == .cancelled)
     }
     
-    @Test func `Wakeup is resumed when signal is called`() async {
+    @Test func `Wait returns resumed when signal is called`() async {
         let wakeup = AsyncWakeup()
         let task = Task.immediate {
             await wakeup.wait()
