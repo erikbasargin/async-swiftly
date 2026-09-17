@@ -65,7 +65,7 @@ public struct AsyncWakeup: ~Copyable, Sendable {
         let next: (Result, CheckedContinuation<Result, Never>)? = state.withLock { state in
             switch (action, state) {
             case let (.signal, .waiting(continuation?)):
-                state = .completed(.resumed)
+                state = .waiting(nil)
                 return (.resumed, continuation)
                 
             case (.signal, .waiting(nil)):

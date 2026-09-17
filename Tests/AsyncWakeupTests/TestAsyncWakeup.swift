@@ -77,4 +77,22 @@ struct TestAsyncWakeup {
         
         #expect(await task.value == .cancelled)
     }
+    
+    @Test func `Wait suspends again after waking a suspended waiter`() async {
+        let wakeup = AsyncWakeup()
+
+        let firstWait = Task.immediate {
+            await wakeup.wait()
+        }
+
+        wakeup.signal()
+        #expect(await firstWait.value == .resumed)
+
+        let secondWait = Task.immediate {
+            await wakeup.wait()
+        }
+
+        secondWait.cancel()
+        #expect(await secondWait.value == .cancelled)
+    }
 }
