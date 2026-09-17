@@ -48,4 +48,15 @@ struct TestAsyncWakeup {
         
         #expect(await task.value == .resumed)
     }
+    
+    @Test func `Wait returns resumed when signal was already called`() async {
+        let wakeup = AsyncWakeup()
+        wakeup.signal()
+        
+        let task = Task {
+            await wakeup.wait()
+        }
+        
+        #expect(await task.value == .resumed)
+    }
 }
