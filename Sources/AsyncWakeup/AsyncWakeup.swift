@@ -42,6 +42,7 @@ public struct AsyncWakeup: ~Copyable, Sendable {
                 let result: Result? = state.withLock { state in
                     switch state {
                     case .completed(let result):
+                        state = .waiting(nil)
                         return result
                     case .waiting(nil):
                         state = .waiting(continuation)
