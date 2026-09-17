@@ -23,12 +23,18 @@ public struct AsyncWakeup: ~Copyable, Sendable {
         case cancel
     }
     
-    private enum State {
+    private enum WaitState {
+        case idle
         case waiting(CheckedContinuation<Result, Never>?)
         case completed(Result)
     }
     
-    private let state = Mutex(State.waiting(nil))
+    private struct State {
+        var pendingResume = false
+        var waitState = WaitState.idle
+    }
+    
+    private let state = Mutex(State())
     
     public init() {}
     
@@ -37,18 +43,29 @@ public struct AsyncWakeup: ~Copyable, Sendable {
     }
     
     public func wait() async -> Result {
-        await withTaskCancellationHandler {
+        state.withLock { state in
+            guard case .idle = state.waitState else {
+                preconditionFailure()
+            }
+            
+            state.waitState = .waiting(nil)
+        }
+        
+        return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 let result: Result? = state.withLock { state in
-                    switch state {
+                    switch state.waitState {
                     case .completed(let result):
-                        state = .waiting(nil)
+                        state.waitState = .idle
                         return result
+                    case .waiting(nil) where state.pendingResume:
+                        state = State()
+                        return .resumed
                     case .waiting(nil):
-                        state = .waiting(continuation)
+                        state.waitState = .waiting(continuation)
                         return nil
-                    case .waiting:
-                        preconditionFailure()
+                    case .idle, .waiting:
+                        preconditionFailure("Invalid state detected: \(state)")
                     }
                 }
                 
@@ -63,21 +80,25 @@ public struct AsyncWakeup: ~Copyable, Sendable {
     
     private func resolve(action: Action) {
         let next: (Result, CheckedContinuation<Result, Never>)? = state.withLock { state in
-            switch (action, state) {
+            switch (action, state.waitState) {
             case let (.signal, .waiting(continuation?)):
-                state = .waiting(nil)
+                state.waitState = .idle
                 return (.resumed, continuation)
                 
+            case (.signal, .idle):
+                state.pendingResume = true
+                return nil
+                
             case (.signal, .waiting(nil)):
-                state = .completed(.resumed)
+                state.waitState = .completed(.resumed)
                 return nil
                 
             case let (.cancel, .waiting(continuation?)):
-                state = .waiting(nil)
+                state.waitState = .idle
                 return (.cancelled, continuation)
                 
             case (.cancel, .waiting(nil)):
-                state = .completed(.cancelled)
+                state.waitState = .completed(.cancelled)
                 return nil
                 
             default:
