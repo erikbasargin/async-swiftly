@@ -73,7 +73,7 @@ public struct AsyncWakeup: ~Copyable, Sendable {
                 return nil
                 
             case let (.cancel, .waiting(continuation?)):
-                state = .completed(.cancelled)
+                state = .waiting(nil)
                 return (.cancelled, continuation)
                 
             case (.cancel, .waiting(nil)):
