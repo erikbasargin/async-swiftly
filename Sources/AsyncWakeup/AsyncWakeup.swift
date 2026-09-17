@@ -18,35 +18,70 @@ public struct AsyncWakeup: ~Copyable, Sendable {
         case cancelled
     }
     
-    private let continuatio: Mutex<CheckedContinuation<Result, Never>?> = .init(nil)
+    private enum Action {
+        case signal
+        case cancel
+    }
+    
+    private enum State {
+        case waiting(CheckedContinuation<Result, Never>?)
+        case completed(Result)
+    }
+    
+    private let state = Mutex(State.waiting(nil))
     
     public init() {}
     
     public func signal() {
-        resume(returning: .resumed)
+        resolve(action: .signal)
     }
     
     public func wait() async -> Result {
-        await withTaskCancellationHandler { 
-            await withCheckedContinuation { continuatio in
-                self.continuatio.withLock {
-                    $0 = continuatio
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                let result: Result? = state.withLock { state in
+                    switch state {
+                    case .completed(let result):
+                        return result
+                    case .waiting(nil):
+                        state = .waiting(continuation)
+                        return nil
+                    case .waiting:
+                        preconditionFailure()
+                    }
+                }
+                
+                if let result {
+                    continuation.resume(returning: result)
                 }
             }
         } onCancel: { 
-            resume(returning: .cancelled)
+            resolve(action: .cancel)
         }
     }
     
-    private func resume(returning result: Result) {
-        let continuation: CheckedContinuation<Result, Never>? = continuatio.withLock { stored in
-            guard let continuation = stored else {
+    private func resolve(action: Action) {
+        let next: (Result, CheckedContinuation<Result, Never>)? = state.withLock { state in
+            switch (action, state) {
+            case let (.signal, .waiting(continuation?)):
+                state = .completed(.resumed)
+                return (.resumed, continuation)
+                
+            case let (.cancel, .waiting(continuation?)):
+                state = .completed(.cancelled)
+                return (.cancelled, continuation)
+                
+            case (.cancel, .waiting(nil)):
+                state = .completed(.cancelled)
+                return nil
+                
+            default:
                 return nil
             }
-            stored = nil
-            return continuation
         }
         
-        continuation?.resume(returning: result)
+        if let (result, continuation) = next {
+            continuation.resume(returning: result)
+        }
     }
 }

@@ -25,6 +25,19 @@ struct TestAsyncWakeup {
         #expect(await task.value == .cancelled)
     }
     
+    @Test func `Wakeup is resumed when task is already cancelled`() async throws {
+        let wakeup = AsyncWakeup()
+        let task = Task {
+            try withUnsafeCurrentTask { currentTask in 
+                try #require(currentTask).cancel()
+            }
+            
+            return await wakeup.wait()
+        }
+        
+        #expect(try await task.value == .cancelled)
+    }
+    
     @Test func `Wakeup is resumed when signal is called`() async {
         let wakeup = AsyncWakeup()
         let task = Task.immediate {
