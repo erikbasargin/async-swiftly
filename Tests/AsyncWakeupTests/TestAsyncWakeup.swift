@@ -63,7 +63,9 @@ struct TestAsyncWakeup {
     @Test func `Wait suspends again after consuming a signal`() async {
         let wakeup = AsyncWakeup()
         
-        wakeup.signal()
+        for _ in 0..<3 {
+            wakeup.signal()
+        }
         
         #expect(await wakeup.wait() == .resumed)
         
