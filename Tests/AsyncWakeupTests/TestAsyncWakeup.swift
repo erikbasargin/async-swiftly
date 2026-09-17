@@ -14,4 +14,14 @@ import Testing
 
 struct TestAsyncWakeup {
     
+    @Test func `Wakeup is resumed when scope is cancelled`() async {
+        let wakeup = AsyncWakeup()
+        let task = Task.immediate {
+            await wakeup.wait()
+        }
+        
+        task.cancel()
+        
+        #expect(await task.value == .cancelled)
+    }
 }

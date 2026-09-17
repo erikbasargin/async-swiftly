@@ -11,9 +11,16 @@
 
 public struct AsyncWakeup: Sendable {
     
+    public enum Result: Sendable, Equatable {
+        case resumed
+        case cancelled
+    }
+    
     public init() {}
     
     public func signal() {}
     
-    public func wait() async throws {}
+    public func wait() async -> Result {
+        .cancelled
+    }
 }
