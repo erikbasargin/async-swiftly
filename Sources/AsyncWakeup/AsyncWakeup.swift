@@ -93,6 +93,10 @@ public struct AsyncWakeup: ~Copyable, Sendable {
                 state.waitState = .completed(.resumed)
                 return nil
                 
+            case (.signal, .completed):
+                state.pendingResume = true
+                return nil
+                
             case let (.cancel, .waiting(continuation?)):
                 state.waitState = .idle
                 return (.cancelled, continuation)
@@ -101,7 +105,10 @@ public struct AsyncWakeup: ~Copyable, Sendable {
                 state.waitState = .completed(.cancelled)
                 return nil
                 
-            default:
+            case (.cancel, .idle):
+                return nil
+                
+            case (.cancel, .completed):
                 return nil
             }
         }
