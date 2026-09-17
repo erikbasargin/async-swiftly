@@ -24,4 +24,15 @@ struct TestAsyncWakeup {
         
         #expect(await task.value == .cancelled)
     }
+    
+    @Test func `Wakeup is resumed when signal is called`() async {
+        let wakeup = AsyncWakeup()
+        let task = Task.immediate {
+            await wakeup.wait()
+        }
+        
+        wakeup.signal()
+        
+        #expect(await task.value == .resumed)
+    }
 }

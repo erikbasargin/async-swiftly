@@ -9,18 +9,44 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct AsyncWakeup: Sendable {
+import Synchronization
+
+public struct AsyncWakeup: ~Copyable, Sendable {
     
     public enum Result: Sendable, Equatable {
         case resumed
         case cancelled
     }
     
+    private let continuatio: Mutex<CheckedContinuation<Result, Never>?> = .init(nil)
+    
     public init() {}
     
-    public func signal() {}
+    public func signal() {
+        resume(returning: .resumed)
+    }
     
     public func wait() async -> Result {
-        .cancelled
+        await withTaskCancellationHandler { 
+            await withCheckedContinuation { continuatio in
+                self.continuatio.withLock {
+                    $0 = continuatio
+                }
+            }
+        } onCancel: { 
+            resume(returning: .cancelled)
+        }
+    }
+    
+    private func resume(returning result: Result) {
+        let continuation: CheckedContinuation<Result, Never>? = continuatio.withLock { stored in
+            guard let continuation = stored else {
+                return nil
+            }
+            stored = nil
+            return continuation
+        }
+        
+        continuation?.resume(returning: result)
     }
 }
