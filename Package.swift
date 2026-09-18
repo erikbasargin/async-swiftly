@@ -34,6 +34,10 @@ let package = Package(
             swiftSettings: defaultSwiftSettings,
         ),
         .target(
+            name: "AsyncWakeup",
+            swiftSettings: defaultSwiftSettings,
+        ),
+        .target(
             name: "BucketPriorityQueue",
             dependencies: [
                 .product(name: "DequeModule", package: "swift-collections")
@@ -47,6 +51,11 @@ let package = Package(
                 .product(name: "Subprocess", package: "swift-subprocess"),
             ],
             resources: [.copy("Fixtures")],
+            swiftSettings: defaultSwiftSettings,
+        ),
+        .testTarget(
+            name: "AsyncWakeupTests",
+            dependencies: ["AsyncWakeup"],
             swiftSettings: defaultSwiftSettings,
         ),
         .testTarget(
