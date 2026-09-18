@@ -21,6 +21,7 @@ public struct AsyncWakeup: ~Copyable, Sendable {
     private enum Action {
         case signal
         case cancel
+        case wait(CheckedContinuation<Result, Never>)
     }
     
     private enum WaitState {
@@ -52,25 +53,7 @@ public struct AsyncWakeup: ~Copyable, Sendable {
         
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                let result: Result? = state.withLock { state in
-                    switch state.waitState {
-                    case .completed(let result):
-                        state.waitState = nil
-                        return result
-                    case .waiting(nil) where state.pendingResume:
-                        state = State()
-                        return .resumed
-                    case .waiting(nil):
-                        state.waitState = .waiting(continuation)
-                        return nil
-                    case nil, .waiting:
-                        preconditionFailure("Invalid state detected: \(state)")
-                    }
-                }
-                
-                if let result {
-                    continuation.resume(returning: result)
-                }
+                resolve(action: .wait(continuation))
             }
         } onCancel: { 
             resolve(action: .cancel)
@@ -79,41 +62,81 @@ public struct AsyncWakeup: ~Copyable, Sendable {
     
     private func resolve(action: Action) {
         let next: (Result, CheckedContinuation<Result, Never>)? = state.withLock { state in
-            switch (action, state.waitState) {
-            case let (.signal, .waiting(continuation?)):
-                state.waitState = nil
-                return (.resumed, continuation)
-                
-            case (.signal, nil):
-                state.pendingResume = true
-                return nil
-                
-            case (.signal, .waiting(nil)):
-                state.waitState = .completed(.resumed)
-                return nil
-                
-            case (.signal, .completed):
-                state.pendingResume = true
-                return nil
-                
-            case let (.cancel, .waiting(continuation?)):
-                state.waitState = nil
-                return (.cancelled, continuation)
-                
-            case (.cancel, .waiting(nil)):
-                state.waitState = .completed(.cancelled)
-                return nil
-                
-            case (.cancel, nil):
-                return nil
-                
-            case (.cancel, .completed):
-                return nil
+            switch action {
+            case .signal:
+                singnalCommand(&state)
+            case .cancel:
+                cancelCommand(&state)
+            case .wait(let continuation):
+                waitCommand(&state, continuation: continuation)
             }
         }
         
         if let (result, continuation) = next {
             continuation.resume(returning: result)
+        }
+    }
+    
+    private func singnalCommand(_ state: inout State) -> (Result, CheckedContinuation<Result, Never>)? {
+        switch state.waitState {
+        case let .waiting(continuation?):
+            state.waitState = nil
+            return (.resumed, continuation)
+            
+        case nil:
+            state.pendingResume = true
+            return nil
+            
+        case .waiting(nil):
+            state.waitState = .completed(.resumed)
+            return nil
+            
+        case .completed(.cancelled):
+            state.pendingResume = true
+            return nil
+        
+        case .completed(.resumed):
+            return nil
+        }
+    }
+    
+    private func cancelCommand(_ state: inout State) -> (Result, CheckedContinuation<Result, Never>)? {
+        switch state.waitState {
+        case let .waiting(continuation?):
+            state.waitState = nil
+            return (.cancelled, continuation)
+            
+        case .waiting(nil):
+            state.waitState = .completed(.cancelled)
+            return nil
+            
+        case nil:
+            return nil
+            
+        case .completed:
+            return nil
+        }
+    }
+    
+    private func waitCommand(
+        _ state: inout State,
+        continuation: CheckedContinuation<Result, Never>,
+    ) -> (Result, CheckedContinuation<Result, Never>)? {
+        switch state.waitState {
+        case .completed(let result):
+            state.waitState = nil
+            return (result, continuation)
+            
+        case .waiting(nil) where state.pendingResume:
+            state = State()
+            return (.resumed, continuation)
+            
+        case .waiting(nil):
+            state.waitState = .waiting(continuation)
+            return nil
+            
+        case nil, .waiting:
+            preconditionFailure("Invalid state detected: \(state)")
         }
     }
 }
