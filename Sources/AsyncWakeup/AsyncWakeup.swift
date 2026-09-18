@@ -24,14 +24,13 @@ public struct AsyncWakeup: ~Copyable, Sendable {
     }
     
     private enum WaitState {
-        case idle
         case waiting(CheckedContinuation<Result, Never>?)
         case completed(Result)
     }
     
     private struct State {
         var pendingResume = false
-        var waitState = WaitState.idle
+        var waitState: WaitState?
     }
     
     private let state = Mutex(State())
@@ -44,7 +43,7 @@ public struct AsyncWakeup: ~Copyable, Sendable {
     
     public func wait() async -> Result {
         state.withLock { state in
-            guard case .idle = state.waitState else {
+            guard state.waitState == nil else {
                 preconditionFailure()
             }
             
@@ -56,7 +55,7 @@ public struct AsyncWakeup: ~Copyable, Sendable {
                 let result: Result? = state.withLock { state in
                     switch state.waitState {
                     case .completed(let result):
-                        state.waitState = .idle
+                        state.waitState = nil
                         return result
                     case .waiting(nil) where state.pendingResume:
                         state = State()
@@ -64,7 +63,7 @@ public struct AsyncWakeup: ~Copyable, Sendable {
                     case .waiting(nil):
                         state.waitState = .waiting(continuation)
                         return nil
-                    case .idle, .waiting:
+                    case nil, .waiting:
                         preconditionFailure("Invalid state detected: \(state)")
                     }
                 }
@@ -82,10 +81,10 @@ public struct AsyncWakeup: ~Copyable, Sendable {
         let next: (Result, CheckedContinuation<Result, Never>)? = state.withLock { state in
             switch (action, state.waitState) {
             case let (.signal, .waiting(continuation?)):
-                state.waitState = .idle
+                state.waitState = nil
                 return (.resumed, continuation)
                 
-            case (.signal, .idle):
+            case (.signal, nil):
                 state.pendingResume = true
                 return nil
                 
@@ -98,14 +97,14 @@ public struct AsyncWakeup: ~Copyable, Sendable {
                 return nil
                 
             case let (.cancel, .waiting(continuation?)):
-                state.waitState = .idle
+                state.waitState = nil
                 return (.cancelled, continuation)
                 
             case (.cancel, .waiting(nil)):
                 state.waitState = .completed(.cancelled)
                 return nil
                 
-            case (.cancel, .idle):
+            case (.cancel, nil):
                 return nil
                 
             case (.cancel, .completed):
