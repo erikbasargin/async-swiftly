@@ -22,6 +22,7 @@ public struct AsyncWakeup: ~Copyable, Sendable {
         case signal
         case cancel
         case wait(CheckedContinuation<Result, Never>)
+        case registerWait
     }
     
     private enum WaitState {
@@ -43,13 +44,7 @@ public struct AsyncWakeup: ~Copyable, Sendable {
     }
     
     public func wait() async -> Result {
-        state.withLock { state in
-            guard state.waitState == nil else {
-                preconditionFailure()
-            }
-            
-            state.waitState = .waiting(nil)
-        }
+        resolve(action: .registerWait)
         
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
@@ -63,6 +58,8 @@ public struct AsyncWakeup: ~Copyable, Sendable {
     private func resolve(action: Action) {
         let next: (Result, CheckedContinuation<Result, Never>)? = state.withLock { state in
             switch action {
+            case .registerWait:
+                registerWaitCommand(&state)
             case .signal:
                 singnalCommand(&state)
             case .cancel:
@@ -75,6 +72,15 @@ public struct AsyncWakeup: ~Copyable, Sendable {
         if let (result, continuation) = next {
             continuation.resume(returning: result)
         }
+    }
+    
+    private func registerWaitCommand(_ state: inout State) -> (Result, CheckedContinuation<Result, Never>)? {
+        guard state.waitState == nil else {
+            preconditionFailure()
+        }
+        
+        state.waitState = .waiting(nil)
+        return nil
     }
     
     private func singnalCommand(_ state: inout State) -> (Result, CheckedContinuation<Result, Never>)? {
