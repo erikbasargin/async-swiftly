@@ -18,29 +18,9 @@ public struct AsyncWakeup: ~Copyable, Sendable {
         case cancelled
     }
     
-    private enum Action {
-        case signal
-        case cancel
-        case wait(CheckedContinuation<Result, Never>)
-        case registerWait
-    }
+    private typealias StateMachine = WakeupMachine<CheckedContinuation<Result, Never>>
     
-    private enum WaitState {
-        case waiting(CheckedContinuation<Result, Never>?)
-        case completed(Result)
-    }
-    
-    private struct State {
-        var pendingResume = false
-        var waitState: WaitState?
-    }
-    
-    private enum Effect {
-        case resume(CheckedContinuation<Result, Never>, Result)
-        case terminateProcess(String)
-    }
-    
-    private let state = Mutex(State())
+    private let machine = Mutex(StateMachine())
     
     public init() {}
     
@@ -60,18 +40,9 @@ public struct AsyncWakeup: ~Copyable, Sendable {
         }
     }
     
-    private func resolve(action: Action) {
-        let effect = state.withLock { state in
-            switch action {
-            case .registerWait:
-                registerWaitCommand(&state)
-            case .signal:
-                singnalCommand(&state)
-            case .cancel:
-                cancelCommand(&state)
-            case .wait(let continuation):
-                waitCommand(&state, continuation: continuation)
-            }
+    private func resolve(action: StateMachine.Action) {
+        let effect = machine.withLock { machine in
+            machine.reduce(action: action)
         }
         
         switch effect {
@@ -83,32 +54,68 @@ public struct AsyncWakeup: ~Copyable, Sendable {
             break
         }
     }
+}
+
+private struct WakeupMachine<Waiter> {
     
-    private func registerWaitCommand(_ state: inout State) -> Effect? {
-        guard state.waitState == nil else {
+    enum Action {
+        case signal
+        case cancel
+        case wait(Waiter)
+        case registerWait
+    }
+    
+    enum Effect {
+        case resume(Waiter, AsyncWakeup.Result)
+        case terminateProcess(String)
+    }
+    
+    private enum WaitState {
+        case waiting(Waiter?)
+        case completed(AsyncWakeup.Result)
+    }
+    
+    private var pendingResume = false
+    private var waitState: WaitState?
+    
+    mutating func reduce(action: Action) -> Effect? {
+        switch action {
+        case .registerWait:
+            register()
+        case .signal:
+            singnal()
+        case .cancel:
+            cancel()
+        case .wait(let waiter):
+            wait(waiter)
+        }
+    }
+    
+    private mutating func register() -> Effect? {
+        guard waitState == nil else {
             return .terminateProcess("Attempt to register wait when already waiting")
         }
         
-        state.waitState = .waiting(nil)
+        waitState = .waiting(nil)
         return nil
     }
     
-    private func singnalCommand(_ state: inout State) -> Effect? {
-        switch state.waitState {
+    private mutating func singnal() -> Effect? {
+        switch waitState {
         case let .waiting(continuation?):
-            state.waitState = nil
+            waitState = nil
             return .resume(continuation, .resumed)
             
         case nil:
-            state.pendingResume = true
+            pendingResume = true
             return nil
             
         case .waiting(nil):
-            state.waitState = .completed(.resumed)
+            waitState = .completed(.resumed)
             return nil
             
         case .completed(.cancelled):
-            state.pendingResume = true
+            pendingResume = true
             return nil
         
         case .completed(.resumed):
@@ -116,14 +123,14 @@ public struct AsyncWakeup: ~Copyable, Sendable {
         }
     }
     
-    private func cancelCommand(_ state: inout State) -> Effect? {
-        switch state.waitState {
+    private mutating func cancel() -> Effect? {
+        switch waitState {
         case let .waiting(continuation?):
-            state.waitState = nil
+            waitState = nil
             return .resume(continuation, .cancelled)
             
         case .waiting(nil):
-            state.waitState = .completed(.cancelled)
+            waitState = .completed(.cancelled)
             return nil
             
         case nil:
@@ -134,21 +141,19 @@ public struct AsyncWakeup: ~Copyable, Sendable {
         }
     }
     
-    private func waitCommand(
-        _ state: inout State,
-        continuation: CheckedContinuation<Result, Never>,
-    ) -> Effect? {
-        switch state.waitState {
+    private mutating func wait(_ waiter: Waiter) -> Effect? {
+        switch waitState {
         case .completed(let result):
-            state.waitState = nil
-            return .resume(continuation, result)
+            waitState = nil
+            return .resume(waiter, result)
             
-        case .waiting(nil) where state.pendingResume:
-            state = State()
-            return .resume(continuation, .resumed)
+        case .waiting(nil) where pendingResume:
+            waitState = nil
+            pendingResume = false
+            return .resume(waiter, .resumed)
             
         case .waiting(nil):
-            state.waitState = .waiting(continuation)
+            waitState = .waiting(waiter)
             return nil
             
         case .waiting:
@@ -159,3 +164,5 @@ public struct AsyncWakeup: ~Copyable, Sendable {
         }
     }
 }
+
+extension WakeupMachine.Action: Sendable where Waiter: Sendable {}
