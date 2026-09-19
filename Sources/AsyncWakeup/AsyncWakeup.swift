@@ -72,7 +72,8 @@ private struct WakeupMachine<Waiter> {
     
     private enum WaitState {
         case waiting(Waiter?)
-        case completed(AsyncWakeup.Result)
+        case finishing
+        case cancelling
     }
     
     private var pendingResume = false
@@ -111,14 +112,14 @@ private struct WakeupMachine<Waiter> {
             return nil
             
         case .waiting(nil):
-            waitState = .completed(.resumed)
+            waitState = .finishing
             return nil
             
-        case .completed(.cancelled):
+        case .cancelling:
             pendingResume = true
             return nil
         
-        case .completed(.resumed):
+        case .finishing:
             return nil
         }
     }
@@ -130,22 +131,26 @@ private struct WakeupMachine<Waiter> {
             return .resume(continuation, .cancelled)
             
         case .waiting(nil):
-            waitState = .completed(.cancelled)
+            waitState = .cancelling
             return nil
             
         case nil:
             return nil
             
-        case .completed:
+        case .cancelling, .finishing:
             return nil
         }
     }
     
     private mutating func wait(_ waiter: Waiter) -> Effect? {
         switch waitState {
-        case .completed(let result):
+        case .finishing:
             waitState = nil
-            return .resume(waiter, result)
+            return .resume(waiter, .resumed)
+            
+        case .cancelling:
+            waitState = nil
+            return .resume(waiter, .cancelled)
             
         case .waiting(nil) where pendingResume:
             waitState = nil
