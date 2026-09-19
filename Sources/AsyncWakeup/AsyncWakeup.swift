@@ -46,8 +46,10 @@ public struct AsyncWakeup: ~Copyable, Sendable {
         }
         
         switch effect {
-        case .resume(let continuation, let result):
-            continuation.resume(returning: result)
+        case .resume(let continuation):
+            continuation.resume(returning: .resumed)
+        case .cancel(let continuation):
+            continuation.resume(returning: .cancelled)
         case .terminateProcess(let message):
             preconditionFailure(message)
         case nil:
@@ -66,7 +68,8 @@ private struct WakeupMachine<Waiter> {
     }
     
     enum Effect {
-        case resume(Waiter, AsyncWakeup.Result)
+        case resume(Waiter)
+        case cancel(Waiter)
         case terminateProcess(String)
     }
     
@@ -103,9 +106,9 @@ private struct WakeupMachine<Waiter> {
     
     private mutating func singnal() -> Effect? {
         switch waitState {
-        case let .waiting(continuation?):
+        case let .waiting(waiter?):
             waitState = nil
-            return .resume(continuation, .resumed)
+            return .resume(waiter)
             
         case nil:
             pendingResume = true
@@ -126,9 +129,9 @@ private struct WakeupMachine<Waiter> {
     
     private mutating func cancel() -> Effect? {
         switch waitState {
-        case let .waiting(continuation?):
+        case let .waiting(waiter?):
             waitState = nil
-            return .resume(continuation, .cancelled)
+            return .cancel(waiter)
             
         case .waiting(nil):
             waitState = .cancelling
@@ -146,16 +149,16 @@ private struct WakeupMachine<Waiter> {
         switch waitState {
         case .finishing:
             waitState = nil
-            return .resume(waiter, .resumed)
+            return .resume(waiter)
             
         case .cancelling:
             waitState = nil
-            return .resume(waiter, .cancelled)
+            return .cancel(waiter)
             
         case .waiting(nil) where pendingResume:
             waitState = nil
             pendingResume = false
-            return .resume(waiter, .resumed)
+            return .resume(waiter)
             
         case .waiting(nil):
             waitState = .waiting(waiter)
