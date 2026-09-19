@@ -35,6 +35,11 @@ public struct AsyncWakeup: ~Copyable, Sendable {
         var waitState: WaitState?
     }
     
+    private enum Effect {
+        case resume(CheckedContinuation<Result, Never>, Result)
+        case terminateProcess(String)
+    }
+    
     private let state = Mutex(State())
     
     public init() {}
@@ -56,7 +61,7 @@ public struct AsyncWakeup: ~Copyable, Sendable {
     }
     
     private func resolve(action: Action) {
-        let next: (Result, CheckedContinuation<Result, Never>)? = state.withLock { state in
+        let effect = state.withLock { state in
             switch action {
             case .registerWait:
                 registerWaitCommand(&state)
@@ -69,25 +74,30 @@ public struct AsyncWakeup: ~Copyable, Sendable {
             }
         }
         
-        if let (result, continuation) = next {
+        switch effect {
+        case .resume(let continuation, let result):
             continuation.resume(returning: result)
+        case .terminateProcess(let message):
+            preconditionFailure(message)
+        case nil:
+            break
         }
     }
     
-    private func registerWaitCommand(_ state: inout State) -> (Result, CheckedContinuation<Result, Never>)? {
+    private func registerWaitCommand(_ state: inout State) -> Effect? {
         guard state.waitState == nil else {
-            preconditionFailure()
+            return .terminateProcess("Attempt to register wait when already waiting")
         }
         
         state.waitState = .waiting(nil)
         return nil
     }
     
-    private func singnalCommand(_ state: inout State) -> (Result, CheckedContinuation<Result, Never>)? {
+    private func singnalCommand(_ state: inout State) -> Effect? {
         switch state.waitState {
         case let .waiting(continuation?):
             state.waitState = nil
-            return (.resumed, continuation)
+            return .resume(continuation, .resumed)
             
         case nil:
             state.pendingResume = true
@@ -106,11 +116,11 @@ public struct AsyncWakeup: ~Copyable, Sendable {
         }
     }
     
-    private func cancelCommand(_ state: inout State) -> (Result, CheckedContinuation<Result, Never>)? {
+    private func cancelCommand(_ state: inout State) -> Effect? {
         switch state.waitState {
         case let .waiting(continuation?):
             state.waitState = nil
-            return (.cancelled, continuation)
+            return .resume(continuation, .cancelled)
             
         case .waiting(nil):
             state.waitState = .completed(.cancelled)
@@ -127,22 +137,25 @@ public struct AsyncWakeup: ~Copyable, Sendable {
     private func waitCommand(
         _ state: inout State,
         continuation: CheckedContinuation<Result, Never>,
-    ) -> (Result, CheckedContinuation<Result, Never>)? {
+    ) -> Effect? {
         switch state.waitState {
         case .completed(let result):
             state.waitState = nil
-            return (result, continuation)
+            return .resume(continuation, result)
             
         case .waiting(nil) where state.pendingResume:
             state = State()
-            return (.resumed, continuation)
+            return .resume(continuation, .resumed)
             
         case .waiting(nil):
             state.waitState = .waiting(continuation)
             return nil
             
-        case nil, .waiting:
-            preconditionFailure("Invalid state detected: \(state)")
+        case .waiting:
+            return .terminateProcess("Wait is already in progress")
+            
+        case nil:
+            return .terminateProcess("Invalid state")
         }
     }
 }
