@@ -57,22 +57,22 @@ struct WakeupMachine<Waiter> {
     
     private mutating func singnal() -> Effect? {
         switch waitState {
-        case let .waiting(waiter?):
+        case .waiting(let waiter?):
             waitState = nil
             return .resume(waiter)
-            
+
         case nil:
             pendingResume = true
             return nil
-            
+
         case .waiting(nil):
             waitState = .finishing
             return nil
-            
+
         case .cancelling:
             pendingResume = true
             return nil
-        
+
         case .finishing:
             return nil
         }
@@ -80,17 +80,17 @@ struct WakeupMachine<Waiter> {
     
     private mutating func cancel() -> Effect? {
         switch waitState {
-        case let .waiting(waiter?):
+        case .waiting(let waiter?):
             waitState = nil
             return .cancel(waiter)
-            
+
         case .waiting(nil):
             waitState = .cancelling
             return nil
-            
+
         case nil:
             return nil
-            
+
         case .cancelling, .finishing:
             return nil
         }
@@ -101,23 +101,23 @@ struct WakeupMachine<Waiter> {
         case .finishing:
             waitState = nil
             return .resume(waiter)
-            
+
         case .cancelling:
             waitState = nil
             return .cancel(waiter)
-            
+
         case .waiting(nil) where pendingResume:
             waitState = nil
             pendingResume = false
             return .resume(waiter)
-            
+
         case .waiting(nil):
             waitState = .waiting(waiter)
             return nil
-            
+
         case .waiting:
             return .terminateProcess("Wait is already in progress")
-            
+
         case nil:
             return .terminateProcess("Invalid state")
         }

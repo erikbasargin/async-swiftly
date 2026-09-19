@@ -28,7 +28,7 @@ struct TestAsyncWakeup {
     @Test func `Wait returns cancelled when task was already cancelled`() async throws {
         let wakeup = AsyncWakeup()
         let task = Task {
-            try withUnsafeCurrentTask { currentTask in 
+            try withUnsafeCurrentTask { currentTask in
                 try #require(currentTask).cancel()
             }
             
@@ -80,36 +80,36 @@ struct TestAsyncWakeup {
     
     @Test func `Wait suspends again after waking a suspended waiter`() async {
         let wakeup = AsyncWakeup()
-
+        
         let firstWait = Task.immediate {
             await wakeup.wait()
         }
-
+        
         wakeup.signal()
         #expect(await firstWait.value == .resumed)
-
+        
         let secondWait = Task.immediate {
             await wakeup.wait()
         }
-
+        
         secondWait.cancel()
         #expect(await secondWait.value == .cancelled)
     }
     
     @Test func `Wait suspends again after waking a cancelled waiter`() async {
         let wakeup = AsyncWakeup()
-
+        
         let firstWait = Task.immediate {
             await wakeup.wait()
         }
-
+        
         firstWait.cancel()
         #expect(await firstWait.value == .cancelled)
-
+        
         let secondWait = Task.immediate {
             await wakeup.wait()
         }
-
+        
         wakeup.signal()
         #expect(await secondWait.value == .resumed)
     }
@@ -138,10 +138,10 @@ struct TestAsyncWakeup {
         
         #expect(secondResult == .resumed)
     }
-
+    
     @Test func `Signal losing race with cancellation is preserved for next wait`() async throws {
         let wakeup = AsyncWakeup()
-
+        
         let firstWait = Task {
             await wakeup.wait()
         }
@@ -154,19 +154,19 @@ struct TestAsyncWakeup {
                 wakeup.signal()
             }
         }
-
+        
         guard await firstWait.value == .cancelled else {
             try Test.cancel("Cancellation must win this iteration")
         }
-
+        
         let secondWait = Task.immediate {
             await wakeup.wait()
         }
-
+        
         secondWait.cancel()
-
+        
         let result = await secondWait.value
-
+        
         #expect(
             result == .resumed,
             "After cancellation wins the first race, the losing signal must be preserved for the next wait.",
