@@ -74,6 +74,7 @@ struct WakeupMachine<Waiter> {
             return nil
 
         case .finishing:
+            pendingResume = true
             return nil
         }
     }
