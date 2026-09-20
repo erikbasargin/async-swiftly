@@ -125,3 +125,4 @@ struct WakeupMachine<Waiter> {
 }
 
 extension WakeupMachine.Action: Sendable where Waiter: Sendable {}
+extension WakeupMachine.Effect: Equatable where Waiter: Equatable {}
