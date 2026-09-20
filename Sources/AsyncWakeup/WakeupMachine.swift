@@ -30,7 +30,7 @@ struct WakeupMachine<Waiter> {
         case cancelling
     }
     
-    private var pendingResume = false
+    private var pendingSignal = false
     private var waitState: WaitState?
     
     mutating func reduce(action: Action) -> Effect? {
@@ -66,7 +66,7 @@ struct WakeupMachine<Waiter> {
             return nil
 
         case .finishing, .cancelling, nil:
-            pendingResume = true
+            pendingSignal = true
             return nil
         }
     }
@@ -99,9 +99,9 @@ struct WakeupMachine<Waiter> {
             waitState = nil
             return .cancel(waiter)
 
-        case .waiting(nil) where pendingResume:
+        case .waiting(nil) where pendingSignal:
             waitState = nil
-            pendingResume = false
+            pendingSignal = false
             return .resume(waiter)
 
         case .waiting(nil):
