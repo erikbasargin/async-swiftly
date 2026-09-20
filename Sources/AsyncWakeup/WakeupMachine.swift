@@ -61,19 +61,11 @@ struct WakeupMachine<Waiter> {
             waitState = nil
             return .resume(waiter)
 
-        case nil:
-            pendingResume = true
-            return nil
-
         case .waiting(nil):
             waitState = .finishing
             return nil
 
-        case .cancelling:
-            pendingResume = true
-            return nil
-
-        case .finishing:
+        case .finishing, .cancelling, nil:
             pendingResume = true
             return nil
         }
