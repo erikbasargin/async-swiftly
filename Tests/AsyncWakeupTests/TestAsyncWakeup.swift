@@ -113,29 +113,4 @@ struct TestAsyncWakeup {
         wakeup.signal()
         #expect(await secondWait.value == .resumed)
     }
-    
-    @Test func `Cancellation losing to signal does not affect next wait`() async throws {
-        let wakeup = AsyncWakeup()
-        
-        let firstWait = Task.immediate {
-            await wakeup.wait()
-        }
-        
-        wakeup.signal()
-        firstWait.cancel()
-        
-        let firstResult = await firstWait.value
-        
-        try #require(firstResult == .resumed)
-        
-        let secondWait = Task.immediate {
-            await wakeup.wait()
-        }
-        
-        wakeup.signal()
-        
-        let secondResult = await secondWait.value
-        
-        #expect(secondResult == .resumed)
-    }
 }

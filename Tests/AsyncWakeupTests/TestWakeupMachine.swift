@@ -14,6 +14,19 @@ import Testing
 @testable import AsyncWakeup
 
 struct TestWakeupMachine {
+
+    @Test func `Cancellation losing to signal does not affect next wait`() {
+        var machine = WakeupMachine<String>()
+
+        #expect(machine.reduce(action: .registerWait) == nil)
+        #expect(machine.reduce(action: .wait("first")) == nil)
+        #expect(machine.reduce(action: .signal) == .resume("first"))
+        #expect(machine.reduce(action: .cancel) == nil)
+
+        #expect(machine.reduce(action: .registerWait) == nil)
+        #expect(machine.reduce(action: .wait("second")) == nil)
+        #expect(machine.reduce(action: .signal) == .resume("second"))
+    }
     
     @Test func `Signal is preserved for next wait when current wait is cancelling`() {
         var machine = WakeupMachine<String>()
