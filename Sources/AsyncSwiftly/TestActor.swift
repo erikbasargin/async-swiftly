@@ -52,7 +52,10 @@ public actor TestActor {
                 }
             }
             body(self, &testGroup)
-            await drain()
+            
+            await withTaskCancellationShield { 
+                await drain()
+            }
             
             // User operations are finished; only the watchdog can remain.
             group.cancelAll()
@@ -82,6 +85,7 @@ public actor TestActor {
         
         defer {
             laneStates[id] = .finished
+            queue.signal()
         }
         
         if case .pending(let continuation) = laneStates[id] {
@@ -119,7 +123,7 @@ public actor TestActor {
             }
             
             guard nextLaneID < laneStates.count else {
-                await Task.yield()
+                await queue.wait()
                 continue
             }
             
@@ -131,7 +135,7 @@ public actor TestActor {
                 nextLaneID += 1
 
             case .active:
-                await Task.yield()
+               await queue.wait()
 
             case .pending:
                 preconditionFailure("The previous lane must already be released")

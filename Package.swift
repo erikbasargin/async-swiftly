@@ -13,7 +13,7 @@ var defaultSwiftSettings: [SwiftSetting] {
 let package = Package(
     name: "async-swiftly",
     platforms: [
-        .macOS(.v26)
+        .macOS(.v27)
     ],
     products: [
         .library(
@@ -29,7 +29,8 @@ let package = Package(
         .target(
             name: "AsyncSwiftly",
             dependencies: [
-                "BucketPriorityQueue"
+                "BucketPriorityQueue",
+                "AsyncWakeup",
             ],
             swiftSettings: defaultSwiftSettings,
         ),
