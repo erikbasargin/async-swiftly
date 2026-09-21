@@ -33,6 +33,7 @@ struct WakeupMachine<Waiter> {
         case cancelling
     }
     
+    private var generation = Generation(value: 0)
     private var pendingSignal = false
     private var waitState: WaitState?
     
@@ -41,18 +42,21 @@ struct WakeupMachine<Waiter> {
             preconditionFailure("Attempt to register wait when already waiting")
         }
         
+        generation = Generation(value: generation.value + 1)
         waitState = .waiting(nil)
-        return Generation(value: 0)
+        return generation
     }
     
     mutating func reduce(action: Action) -> Effect? {
         switch action {
         case .signal:
             singnal()
-        case .cancel:
+        case .cancel(let generation) where generation == self.generation:
             cancel()
-        case .wait(let generation, let waiter):
+        case .wait(_, let waiter):
             wait(waiter)
+        default:
+            nil
         }
     }
     

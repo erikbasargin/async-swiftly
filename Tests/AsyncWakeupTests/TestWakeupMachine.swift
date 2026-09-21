@@ -29,6 +29,24 @@ struct TestWakeupMachine {
         #expect(machine.reduce(action: .wait(generationTwo, "second")) == nil)
         #expect(machine.reduce(action: .signal) == .resume("second"))
     }
+
+    @Test func `Stale cancellation does not cross wait generations`() {
+        var machine = WakeupMachine<String>()
+        
+        let generationOne = machine.registerWait()
+
+        #expect(machine.reduce(action: .wait(generationOne, "first")) == nil)
+        #expect(machine.reduce(action: .signal) == .resume("first"))
+
+        let generationTwo = machine.registerWait()
+
+        #expect(machine.reduce(action: .wait(generationTwo, "second")) == nil)
+        #expect(
+            machine.reduce(action: .cancel(generationOne)) == nil,
+            "Cancellation belonging to the first wait must not cancel the subsequent wait.",
+        )
+        #expect(machine.reduce(action: .signal) == .resume("second"))
+    }
     
     @Test func `Signal is preserved for next wait when current wait is cancelling`() {
         var machine = WakeupMachine<String>()
