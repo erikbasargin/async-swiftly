@@ -9,11 +9,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AsyncWakeup
 import BucketPriorityQueue
 import Synchronization
 
 final class JobPriorityQueue: Sendable {
     
+    private let wakeup = AsyncWakeup()
     private let queue = Mutex(BucketPriorityQueue<UnownedJob>())
     
     var isEmpty: Bool {
@@ -30,11 +32,21 @@ final class JobPriorityQueue: Sendable {
         queue.withLock { queue in
             queue.append(element, to: bucketIndex)
         }
+        wakeup.signal()
     }
     
     func popFirst() -> (bucketIndex: Int, element: UnownedJob)? {
         queue.withLock { queue in
             queue.popFirst()
         }
+    }
+    
+    @discardableResult
+    func wait() async -> AsyncWakeup.Result {
+        await wakeup.wait()
+    }
+    
+    func signal() {
+        wakeup.signal()
     }
 }
