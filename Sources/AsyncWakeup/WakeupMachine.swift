@@ -11,11 +11,14 @@
 
 struct WakeupMachine<Waiter> {
     
+    struct Generation: Hashable, Sendable {
+        fileprivate let value: UInt64
+    }
+    
     enum Action {
         case signal
-        case cancel
-        case wait(Waiter)
-        case registerWait
+        case cancel(Generation)
+        case wait(Generation, Waiter)
     }
     
     enum Effect {
@@ -33,26 +36,24 @@ struct WakeupMachine<Waiter> {
     private var pendingSignal = false
     private var waitState: WaitState?
     
+    mutating func registerWait() -> Generation {
+        guard waitState == nil else {
+            preconditionFailure("Attempt to register wait when already waiting")
+        }
+        
+        waitState = .waiting(nil)
+        return Generation(value: 0)
+    }
+    
     mutating func reduce(action: Action) -> Effect? {
         switch action {
-        case .registerWait:
-            register()
         case .signal:
             singnal()
         case .cancel:
             cancel()
-        case .wait(let waiter):
+        case .wait(let generation, let waiter):
             wait(waiter)
         }
-    }
-    
-    private mutating func register() -> Effect? {
-        guard waitState == nil else {
-            return .terminateProcess("Attempt to register wait when already waiting")
-        }
-        
-        waitState = .waiting(nil)
-        return nil
     }
     
     private mutating func singnal() -> Effect? {

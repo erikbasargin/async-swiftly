@@ -29,14 +29,20 @@ public struct AsyncWakeup: ~Copyable, Sendable {
     }
     
     public func wait() async -> Result {
-        resolve(action: .registerWait)
+        let generation = registerWait()
         
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                resolve(action: .wait(continuation))
+                resolve(action: .wait(generation, continuation))
             }
         } onCancel: {
-            resolve(action: .cancel)
+            resolve(action: .cancel(generation))
+        }
+    }
+    
+    private func registerWait() -> StateMachine.Generation {
+        machine.withLock { machine in
+            machine.registerWait()
         }
     }
     
