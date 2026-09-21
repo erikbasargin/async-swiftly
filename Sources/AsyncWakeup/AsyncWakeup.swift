@@ -33,7 +33,7 @@ public struct AsyncWakeup: ~Copyable, Sendable {
         
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                resolve(action: .wait(generation, continuation))
+                resolve(action: .wait(continuation))
             }
         } onCancel: {
             resolve(action: .cancel(generation))

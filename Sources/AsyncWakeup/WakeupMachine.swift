@@ -18,7 +18,7 @@ struct WakeupMachine<Waiter> {
     enum Action {
         case signal
         case cancel(Generation)
-        case wait(Generation, Waiter)
+        case wait(Waiter)
     }
     
     enum Effect {
@@ -53,7 +53,7 @@ struct WakeupMachine<Waiter> {
             singnal()
         case .cancel(let generation) where generation == self.generation:
             cancel()
-        case .wait(_, let waiter):
+        case .wait(let waiter):
             wait(waiter)
         default:
             nil
