@@ -135,7 +135,27 @@ public actor TestActor {
                 nextLaneID += 1
 
             case .active:
-               await queue.wait()
+                let blockDetected = await withTaskGroup { [queue] group in
+                    group.addTask { 
+                        await queue.wait() == .resumed
+                    }
+                    group.addTask {
+                        for _ in 0..<1000 {
+                            if Task.isCancelled { return false }
+                            await Task.yield()
+                        }
+                        return true
+                    }
+                    
+                    let result = await group.next()!
+                    group.cancelAll()
+                    return result
+                }
+                
+                if blockDetected {
+                    resume(laneID: nextLaneID)
+                    nextLaneID += 1
+                }
 
             case .pending:
                 preconditionFailure("The previous lane must already be released")

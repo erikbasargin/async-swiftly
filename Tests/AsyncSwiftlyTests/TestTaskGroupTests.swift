@@ -131,6 +131,29 @@ struct TestTaskGroupTests {
         
         #expect(events.values == ["cleanup"])
     }
+    
+    @Test func `Suspended operation does not block later operations`() async throws {
+        let events = Events<Int>()
+        let dependency = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(0))
+        defer {
+            dependency.continuation.finish()
+        }
+        
+        try await withTestTaskGroup { _, group in
+            group.addTask { _ in
+                events.append(0)
+                await dependency.stream.first(where: { _ in true })
+                events.append(3)
+            }
+            group.addTask { _ in
+                events.append(1)
+                dependency.continuation.yield()
+                events.append(2)
+            }
+        }
+        
+        #expect(events.values == [0, 1, 2, 3])
+    }
 }
 
 private final class Events<Value: Sendable>: Sendable {
