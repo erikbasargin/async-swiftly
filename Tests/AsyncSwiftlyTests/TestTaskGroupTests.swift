@@ -154,10 +154,26 @@ struct TestTaskGroupTests {
         
         #expect(events.values == [0, 1, 2, 3])
     }
+    
+    @Test func `Completed group releases test actor`() async throws {
+        let reference = WeakActor()
+        try await withTestTaskGroup { actor, group in
+            reference.set(actor)
+            group.addTask { _ in await Task.yield() }
+        }
+        #expect(reference.value == nil)
+    }
 }
 
 private final class Events<Value: Sendable>: Sendable {
     private let state = Mutex<[Value]>([])
     var values: [Value] { state.withLock { $0 } }
     func append(_ value: Value) { state.withLock { $0.append(value) } }
+}
+
+private final class WeakActor: Sendable {
+    private struct State { weak var actor: TestActor? }
+    private let state = Mutex(State())
+    var value: TestActor? { state.withLock { $0.actor } }
+    func set(_ actor: TestActor) { state.withLock { $0.actor = actor } }
 }
