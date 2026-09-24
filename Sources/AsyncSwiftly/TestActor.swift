@@ -15,24 +15,10 @@ public actor TestActor {
     
     nonisolated public struct TimeoutError: Error {}
     
-    private enum LaneState {
-        case pending(CheckedContinuation<Void, Never>?)
-        case active
-        case finished
-        
-        var isFinished: Bool {
-            if case .finished = self {
-                true
-            } else {
-                false
-            }
-        }
-    }
-    
     nonisolated private let queue = JobPriorityQueue()
     
     private var executors: [OperationExecutor] = []
-    private var laneStates: [LaneState] = []
+    private var laneGroup = LaneGroupMachine<CheckedContinuation<Void, Never>>()
     
     func run(
         timeout seconds: TimeInterval = 5,
@@ -53,7 +39,7 @@ public actor TestActor {
             }
             body(self, &testGroup)
             
-            await withTaskCancellationShield { 
+            await withTaskCancellationShield {
                 await drain()
             }
             
@@ -70,8 +56,9 @@ public actor TestActor {
             unownedExecutor: unownedExecutor,
         )
         executors.append(executor)
-        laneStates.append(.pending(nil))
+        let laneID = laneGroup.registerLane()
         
+        assert(bucketId == laneID)
         assert(bucketId == executors.count - 1)
         
         return bucketId
@@ -84,14 +71,13 @@ public actor TestActor {
         let executor = executors[id]
         
         defer {
-            laneStates[id] = .finished
+            laneGroup.finish(laneID: id)
             queue.signal()
         }
         
-        if case .pending(let continuation) = laneStates[id] {
-            assert(continuation == nil)
+        if laneGroup.isPending(laneID: id) {
             await withCheckedContinuation { continuation in
-                laneStates[id] = .pending(continuation)
+                laneGroup.wait(laneID: id, waiter: continuation)
             }
         }
         
@@ -105,11 +91,9 @@ public actor TestActor {
     }
     
     private func drain() async {
-        var nextLaneID = 0
-        
         while true {
             if let (bucketIndex, job) = queue.popFirst() {
-                assert(bucketIndex <= nextLaneID)
+                assert(bucketIndex <= laneGroup.nextLaneID)
                 let executor = executors[bucketIndex]
                 job.runSynchronously(
                     isolatedTo: executor.unownedExecutor,
@@ -118,25 +102,16 @@ public actor TestActor {
                 continue
             }
             
-            if laneStates.allSatisfy(\.isFinished) {
+            switch laneGroup.nextDrainAction() {
+            case .complete:
                 return
-            }
-            
-            guard nextLaneID < laneStates.count else {
+            case .wait:
                 await queue.wait()
-                continue
-            }
-            
-            let previousState = nextLaneID == 0 ? nil : laneStates[nextLaneID - 1]
-            
-            switch previousState {
-            case nil, .finished:
-                resume(laneID: nextLaneID)
-                nextLaneID += 1
-
-            case .active:
+            case .resume(let continuation):
+                continuation?.resume()
+            case .detectBlock:
                 let blockDetected = await withTaskGroup { [queue] group in
-                    group.addTask { 
+                    group.addTask {
                         await queue.wait() == .resumed
                     }
                     group.addTask {
@@ -153,21 +128,9 @@ public actor TestActor {
                 }
                 
                 if blockDetected {
-                    resume(laneID: nextLaneID)
-                    nextLaneID += 1
+                    laneGroup.releaseNextLane()?.resume()
                 }
-
-            case .pending:
-                preconditionFailure("The previous lane must already be released")
             }
         }
-    }
-    
-    private func resume(laneID: Int) {
-        guard case .pending(let continuation) = laneStates[laneID] else {
-            preconditionFailure("A lane can only be released once")
-        }
-        laneStates[laneID] = .active
-        continuation?.resume()
     }
 }
