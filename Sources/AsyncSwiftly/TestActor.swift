@@ -93,7 +93,7 @@ public actor TestActor {
     private func drain() async {
         while true {
             if let (bucketIndex, job) = queue.popFirst() {
-                assert(bucketIndex <= laneGroup.nextLaneID)
+                assert(laneGroup.isReleased(laneID: bucketIndex))
                 let executor = executors[bucketIndex]
                 job.runSynchronously(
                     isolatedTo: executor.unownedExecutor,

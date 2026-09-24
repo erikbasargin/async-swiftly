@@ -33,7 +33,7 @@ struct LaneGroupMachine<Waiter> {
     }
     
     private var lanes: [LaneState] = []
-    private(set) var nextLaneID = 0
+    private var nextLaneID = 0
     
     mutating func registerLane() -> Int {
         let id = lanes.count
@@ -41,6 +41,10 @@ struct LaneGroupMachine<Waiter> {
         return id
     }
     
+    func isReleased(laneID: Int) -> Bool {
+        laneID < nextLaneID
+    }
+
     func isPending(laneID: Int) -> Bool {
         if case .pending = lanes[laneID] {
             true
