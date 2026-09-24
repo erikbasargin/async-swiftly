@@ -9,6 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AsyncWakeup
 import Foundation
 
 public actor TestActor {
@@ -17,9 +18,8 @@ public actor TestActor {
     
     nonisolated private let queue = JobPriorityQueue()
     
-    private var gates: [AsyncStream<Void>] = []
-    private var executors: [OperationExecutor] = []
-    private var laneGroup = LaneGroupMachine<AsyncStream<Void>.Continuation>()
+    private var executors: [LaneExecutor] = []
+    private var laneGroup = LaneGroupMachine<AsyncStream<Never>.Continuation>()
     
     func run(
         timeout seconds: TimeInterval = 5,
@@ -49,14 +49,16 @@ public actor TestActor {
         }
     }
     
-    func registerLane() -> LaneID {
-        let gate = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(0))
-        let laneID = laneGroup.registerLane(waiter: gate.continuation)
-        
-        gates.append(gate.stream)
+    func makeLane() -> Lane {
+        let (releaseStream, releaseContinuation) = AsyncStream.makeStream(
+            of: Never.self,
+            bufferingPolicy: .bufferingNewest(0),
+        )
+        let laneID = laneGroup.registerLane(releaseContinuation)
+        let gate = Lane(laneID: laneID, gate: releaseStream)
         
         queue.appendLane(laneID)
-        let executor = OperationExecutor(
+        let executor = LaneExecutor(
             laneID: laneID,
             queue: queue,
             unownedExecutor: unownedExecutor,
@@ -65,23 +67,19 @@ public actor TestActor {
         
         assert(laneID.index == executors.count - 1)
         
-        return laneID
+        return gate
     }
     
-    func runLane(
-        _ laneID: LaneID,
+    func runOperation(
+        in lane: consuming ReleasedLane,
         operation: @escaping @Sendable (isolated TestActor) async -> Void,
     ) async {
+        let laneID = lane.id
         let executor = executors[laneID.index]
-        let gate = gates[laneID.index]
         
         defer {
             laneGroup.finish(laneID)
             queue.signal()
-        }
-        
-        await withTaskCancellationShield { 
-            await gate.first(where: { _ in true })
         }
         
         guard Task.isCancelled == false else {
@@ -108,10 +106,13 @@ public actor TestActor {
             switch laneGroup.nextDrainAction() {
             case .complete:
                 return
+                
             case .wait:
                 await queue.wait()
-            case .resume(let continuation):
-                continuation.finish()
+                
+            case .releaseLane(let gate):
+                gate.finish()
+                
             case .detectBlock:
                 let blockDetected = await withTaskGroup { [queue] group in
                     group.addTask {
@@ -135,5 +136,31 @@ public actor TestActor {
                 }
             }
         }
+    }
+}
+
+final class Lane: Sendable {
+    private let laneID: LaneID
+    private let gate: AsyncStream<Never>
+    
+    fileprivate init(laneID: LaneID, gate: AsyncStream<Never>) {
+        self.laneID = laneID
+        self.gate = gate
+    }
+
+    func waitUntilReleased() async -> ReleasedLane {
+        await withTaskCancellationShield {
+            var iterator = gate.makeAsyncIterator()
+            await iterator.next()
+        }
+        return ReleasedLane(id: laneID)
+    }
+}
+
+struct ReleasedLane: ~Copyable, Sendable {
+    fileprivate let id: LaneID
+
+    fileprivate init(id: LaneID) {
+        self.id = id
     }
 }

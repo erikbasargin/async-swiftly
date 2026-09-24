@@ -9,17 +9,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-struct LaneGroupMachine<Waiter> {
+struct LaneGroupMachine<Continuation> {
     
     enum DrainAction {
-        case resume(Waiter)
+        case releaseLane(Continuation)
         case wait
         case detectBlock
         case complete
     }
     
     private enum LaneState {
-        case pending(Waiter)
+        case pending(Continuation)
         case active
         case finished
         
@@ -35,9 +35,9 @@ struct LaneGroupMachine<Waiter> {
     private var lanes: [LaneState] = []
     private var nextLaneIndex = 0
     
-    mutating func registerLane(waiter: Waiter) -> LaneID {
+    mutating func registerLane(_ continuation: Continuation) -> LaneID {
         let id = LaneID(index: lanes.count)
-        lanes.append(.pending(waiter))
+        lanes.append(.pending(continuation))
         return id
     }
     
@@ -61,7 +61,7 @@ struct LaneGroupMachine<Waiter> {
         let previousState = nextLaneIndex == 0 ? nil : lanes[nextLaneIndex - 1]
         switch previousState {
         case nil, .finished:
-            return .resume(releaseNextLane())
+            return .releaseLane(releaseNextLane())
         case .active:
             return .detectBlock
         case .pending:
@@ -69,12 +69,12 @@ struct LaneGroupMachine<Waiter> {
         }
     }
     
-    mutating func releaseNextLane() -> Waiter {
-        guard case .pending(let waiter) = lanes[nextLaneIndex] else {
+    mutating func releaseNextLane() -> Continuation {
+        guard case .pending(let continuation) = lanes[nextLaneIndex] else {
             preconditionFailure("A lane can only be released once")
         }
         lanes[nextLaneIndex] = .active
         nextLaneIndex += 1
-        return waiter
+        return continuation
     }
 }
