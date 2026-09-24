@@ -22,22 +22,26 @@ final class JobPriorityQueue: Sendable {
         queue.withLock(\.isEmpty)
     }
     
-    func appendBucket() -> Int {
+    func appendLane(_ laneID: LaneID) {
         queue.withLock { queue in
-            queue.appendBucket()
+            let bucketIndex = queue.appendBucket()
+            assert(bucketIndex == laneID.index)
         }
     }
     
-    func append(_ element: UnownedJob, to bucketIndex: Int) {
+    func append(_ element: UnownedJob, to laneID: LaneID) {
         queue.withLock { queue in
-            queue.append(element, to: bucketIndex)
+            queue.append(element, to: laneID.index)
         }
         wakeup.signal()
     }
     
-    func popFirst() -> (bucketIndex: Int, element: UnownedJob)? {
+    func popFirst() -> (laneID: LaneID, element: UnownedJob)? {
         queue.withLock { queue in
-            queue.popFirst()
+            guard let (bucketIndex, element) = queue.popFirst() else {
+                return nil
+            }
+            return (LaneID(index: bucketIndex), element)
         }
     }
     
