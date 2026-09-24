@@ -11,12 +11,12 @@
 
 final class OperationExecutor: TaskExecutor, SerialExecutor {
     
-    let id: Int
+    let laneID: LaneID
     let queue: JobPriorityQueue
     let unownedExecutor: UnownedSerialExecutor
     
-    init(id: Int, queue: JobPriorityQueue, unownedExecutor: UnownedSerialExecutor) {
-        self.id = id
+    init(laneID: LaneID, queue: JobPriorityQueue, unownedExecutor: UnownedSerialExecutor) {
+        self.laneID = laneID
         self.queue = queue
         self.unownedExecutor = unownedExecutor
     }
@@ -26,6 +26,6 @@ final class OperationExecutor: TaskExecutor, SerialExecutor {
     }
     
     func enqueue(_ job: consuming ExecutorJob) {
-        queue.append(UnownedJob(job), to: id)
+        queue.append(UnownedJob(job), to: laneID)
     }
 }
