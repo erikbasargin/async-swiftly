@@ -25,11 +25,12 @@ public struct TestTaskGroup: ~Copyable {
     var base: ThrowingDiscardingTaskGroup<any Error>
     
     package mutating func addTask(operation: @escaping @Sendable (isolated TestActor) async -> Void) {
-        let laneID = testActor.assumeIsolated { actor in
-            actor.registerLane()
+        let lane = testActor.assumeIsolated { actor in
+            actor.makeLane()
         }
         base.addTask { [testActor] in
-            await testActor.runLane(laneID, operation: operation)
+            let lane = await lane.waitUntilReleased()
+            await testActor.runOperation(in: lane, operation: operation)
         }
     }
 }
