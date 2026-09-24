@@ -9,7 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-final class OperationExecutor: TaskExecutor, SerialExecutor {
+final class LaneExecutor: TaskExecutor, SerialExecutor {
     
     let laneID: LaneID
     let queue: JobPriorityQueue
