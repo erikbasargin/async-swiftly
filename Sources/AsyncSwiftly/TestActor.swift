@@ -48,36 +48,35 @@ public actor TestActor {
         }
     }
     
-    func registerLane() -> Int {
-        let bucketId = queue.appendBucket()
+    func registerLane() -> LaneID {
+        let laneID = laneGroup.registerLane()
+        queue.appendLane(laneID)
         let executor = OperationExecutor(
-            id: bucketId,
+            laneID: laneID,
             queue: queue,
             unownedExecutor: unownedExecutor,
         )
         executors.append(executor)
-        let laneID = laneGroup.registerLane()
         
-        assert(bucketId == laneID)
-        assert(bucketId == executors.count - 1)
+        assert(laneID.index == executors.count - 1)
         
-        return bucketId
+        return laneID
     }
     
     func runLane(
-        id: Int,
+        _ laneID: LaneID,
         operation: @escaping @Sendable (isolated TestActor) async -> Void,
     ) async {
-        let executor = executors[id]
+        let executor = executors[laneID.index]
         
         defer {
-            laneGroup.finish(laneID: id)
+            laneGroup.finish(laneID)
             queue.signal()
         }
         
-        if laneGroup.isPending(laneID: id) {
+        if laneGroup.isPending(laneID) {
             await withCheckedContinuation { continuation in
-                laneGroup.wait(laneID: id, waiter: continuation)
+                laneGroup.wait(laneID: laneID, waiter: continuation)
             }
         }
         
@@ -92,9 +91,9 @@ public actor TestActor {
     
     private func drain() async {
         while true {
-            if let (bucketIndex, job) = queue.popFirst() {
-                assert(laneGroup.isReleased(laneID: bucketIndex))
-                let executor = executors[bucketIndex]
+            if let (laneID, job) = queue.popFirst() {
+                assert(laneGroup.isReleased(laneID))
+                let executor = executors[laneID.index]
                 job.runSynchronously(
                     isolatedTo: executor.unownedExecutor,
                     taskExecutor: executor.asUnownedTaskExecutor(),

@@ -29,7 +29,7 @@ public struct TestTaskGroup: ~Copyable {
             actor.registerLane()
         }
         base.addTask { [testActor] in
-            await testActor.runLane(id: laneID, operation: operation)
+            await testActor.runLane(laneID, operation: operation)
         }
     }
 }

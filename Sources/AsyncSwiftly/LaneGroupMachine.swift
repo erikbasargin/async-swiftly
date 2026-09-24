@@ -33,36 +33,36 @@ struct LaneGroupMachine<Waiter> {
     }
     
     private var lanes: [LaneState] = []
-    private var nextLaneID = 0
+    private var nextLaneIndex = 0
     
-    mutating func registerLane() -> Int {
-        let id = lanes.count
+    mutating func registerLane() -> LaneID {
+        let id = LaneID(index: lanes.count)
         lanes.append(.pending(nil))
         return id
     }
     
-    func isReleased(laneID: Int) -> Bool {
-        laneID < nextLaneID
+    func isReleased(_ laneID: LaneID) -> Bool {
+        laneID.index < nextLaneIndex
     }
 
-    func isPending(laneID: Int) -> Bool {
-        if case .pending = lanes[laneID] {
+    func isPending(_ laneID: LaneID) -> Bool {
+        if case .pending = lanes[laneID.index] {
             true
         } else {
             false
         }
     }
     
-    mutating func wait(laneID: Int, waiter: Waiter) {
-        guard case .pending(let existingWaiter) = lanes[laneID] else {
+    mutating func wait(laneID: LaneID, waiter: Waiter) {
+        guard case .pending(let existingWaiter) = lanes[laneID.index] else {
             preconditionFailure("Only a pending lane can wait")
         }
         assert(existingWaiter == nil)
-        lanes[laneID] = .pending(waiter)
+        lanes[laneID.index] = .pending(waiter)
     }
     
-    mutating func finish(laneID: Int) {
-        lanes[laneID] = .finished
+    mutating func finish(_ laneID: LaneID) {
+        lanes[laneID.index] = .finished
     }
     
     mutating func nextDrainAction() -> DrainAction {
@@ -70,11 +70,11 @@ struct LaneGroupMachine<Waiter> {
             return .complete
         }
         
-        guard nextLaneID < lanes.count else {
+        guard nextLaneIndex < lanes.count else {
             return .wait
         }
         
-        let previousState = nextLaneID == 0 ? nil : lanes[nextLaneID - 1]
+        let previousState = nextLaneIndex == 0 ? nil : lanes[nextLaneIndex - 1]
         switch previousState {
         case nil, .finished:
             return .resume(releaseNextLane())
@@ -86,11 +86,11 @@ struct LaneGroupMachine<Waiter> {
     }
     
     mutating func releaseNextLane() -> Waiter? {
-        guard case .pending(let waiter) = lanes[nextLaneID] else {
+        guard case .pending(let waiter) = lanes[nextLaneIndex] else {
             preconditionFailure("A lane can only be released once")
         }
-        lanes[nextLaneID] = .active
-        nextLaneID += 1
+        lanes[nextLaneIndex] = .active
+        nextLaneIndex += 1
         return waiter
     }
 }
