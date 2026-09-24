@@ -17,8 +17,9 @@ public actor TestActor {
     
     nonisolated private let queue = JobPriorityQueue()
     
+    private var gates: [AsyncStream<Void>] = []
     private var executors: [OperationExecutor] = []
-    private var laneGroup = LaneGroupMachine<CheckedContinuation<Void, Never>>()
+    private var laneGroup = LaneGroupMachine<AsyncStream<Void>.Continuation>()
     
     func run(
         timeout seconds: TimeInterval = 5,
@@ -49,7 +50,11 @@ public actor TestActor {
     }
     
     func registerLane() -> LaneID {
-        let laneID = laneGroup.registerLane()
+        let gate = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(0))
+        let laneID = laneGroup.registerLane(waiter: gate.continuation)
+        
+        gates.append(gate.stream)
+        
         queue.appendLane(laneID)
         let executor = OperationExecutor(
             laneID: laneID,
@@ -68,16 +73,15 @@ public actor TestActor {
         operation: @escaping @Sendable (isolated TestActor) async -> Void,
     ) async {
         let executor = executors[laneID.index]
+        let gate = gates[laneID.index]
         
         defer {
             laneGroup.finish(laneID)
             queue.signal()
         }
         
-        if laneGroup.isPending(laneID) {
-            await withCheckedContinuation { continuation in
-                laneGroup.wait(laneID: laneID, waiter: continuation)
-            }
+        await withTaskCancellationShield { 
+            await gate.first(where: { _ in true })
         }
         
         guard Task.isCancelled == false else {
@@ -107,7 +111,7 @@ public actor TestActor {
             case .wait:
                 await queue.wait()
             case .resume(let continuation):
-                continuation?.resume()
+                continuation.finish()
             case .detectBlock:
                 let blockDetected = await withTaskGroup { [queue] group in
                     group.addTask {
@@ -127,7 +131,7 @@ public actor TestActor {
                 }
                 
                 if blockDetected {
-                    laneGroup.releaseNextLane()?.resume()
+                    laneGroup.releaseNextLane().finish()
                 }
             }
         }
