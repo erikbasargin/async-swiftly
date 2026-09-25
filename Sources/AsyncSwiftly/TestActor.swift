@@ -98,13 +98,13 @@ public actor TestActor {
             switch laneGroup.nextDrainAction() {
             case .complete:
                 return
-                
+
             case .wait:
                 await queue.wait()
-                
+
             case .releaseLane(let gate):
                 gate.finish()
-                
+
             case .detectBlock:
                 let blockDetected = await withTaskGroup { [queue] group in
                     group.addTask {
@@ -139,7 +139,7 @@ final class Lane: Sendable {
         self.laneID = laneID
         self.gate = gate
     }
-
+    
     func waitUntilReleased() async -> ReleasedLane {
         await withTaskCancellationShield {
             var iterator = gate.makeAsyncIterator()
@@ -151,8 +151,4 @@ final class Lane: Sendable {
 
 struct ReleasedLane: ~Copyable, Sendable {
     fileprivate let id: LaneID
-
-    fileprivate init(id: LaneID) {
-        self.id = id
-    }
 }
