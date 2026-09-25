@@ -14,11 +14,13 @@ import Foundation
 
 public actor TestActor {
     
+    private typealias StateMachine = LaneGroupMachine<AsyncStream<Never>.Continuation>
+    
     nonisolated public struct TimeoutError: Error {}
     
     nonisolated private let queue = JobPriorityQueue()
     
-    private var laneGroup = LaneGroupMachine<AsyncStream<Never>.Continuation>()
+    private var laneGroupMachine = StateMachine()
     
     func run(
         timeout seconds: TimeInterval,
@@ -39,9 +41,7 @@ public actor TestActor {
             }
             body(self, &testGroup)
             
-            await withTaskCancellationShield {
-                await drain()
-            }
+            await drain()
             
             // User operations are finished; only the watchdog can remain.
             group.cancelAll()
@@ -53,7 +53,7 @@ public actor TestActor {
             of: Never.self,
             bufferingPolicy: .bufferingNewest(0),
         )
-        let laneID = laneGroup.registerLane(releaseContinuation)
+        let laneID = laneGroupMachine.registerLane(releaseContinuation)
         let gate = Lane(laneID: laneID, gate: releaseStream)
         
         queue.appendLane(laneID)
@@ -66,7 +66,7 @@ public actor TestActor {
         operation: @escaping @Sendable (isolated TestActor) async -> Void,
     ) async {
         defer {
-            laneGroup.finish(laneID)
+            laneGroupMachine.finish(laneID)
             queue.signal()
         }
         
@@ -88,42 +88,50 @@ public actor TestActor {
     private func drain() async {
         while true {
             if let (laneID, job) = queue.popFirst() {
-                assert(laneGroup.isReleased(laneID))
+                assert(laneGroupMachine.isReleased(laneID))
                 job.runSynchronously(isolatedTo: unownedExecutor)
                 continue
             }
             
-            switch laneGroup.nextDrainAction() {
-            case .complete:
-                return
+            var effect = laneGroupMachine.reduce(.stalled)
+            
+            while let currentEffect = effect {
+                switch currentEffect {
+                case .releaseLane(let gate):
+                    gate.finish()
+                    effect = nil
 
-            case .wait:
-                await queue.wait()
+                case .suspend(let detectingQuiescence):
+                    let action = await waitForResume(detectingQuiescence)
+                    effect = laneGroupMachine.reduce(action)
 
-            case .releaseLane(let gate):
-                gate.finish()
-
-            case .detectBlock:
-                let blockDetected = await withTaskGroup { [queue] group in
-                    group.addTask {
-                        await queue.wait() == .resumed
-                    }
+                case .complete:
+                    return
+                }
+            }
+        }
+    }
+    
+    private func waitForResume(_ detectingQuiescence: Bool) async -> StateMachine.DrainAction {
+        await withTaskCancellationShield {
+            await withTaskGroup { [queue] group in
+                group.addTask {
+                    await queue.wait()
+                    return StateMachine.DrainAction.resumed
+                }
+                if detectingQuiescence {
                     group.addTask {
                         for _ in 0..<1000 {
-                            if Task.isCancelled { return false }
+                            if Task.isCancelled { return .resumed }
                             await Task.yield()
                         }
-                        return true
+                        return .quiescenceDetected
                     }
-                    
-                    let result = await group.next()!
-                    group.cancelAll()
-                    return result
                 }
                 
-                if blockDetected {
-                    laneGroup.releaseNextLane().finish()
-                }
+                let result = await group.next()!
+                group.cancelAll()
+                return result
             }
         }
     }
