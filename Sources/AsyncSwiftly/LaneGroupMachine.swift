@@ -11,10 +11,15 @@
 
 struct LaneGroupMachine<Continuation> {
     
-    enum DrainAction {
+    enum DrainAction: Sendable {
+        case stalled
+        case resumed
+        case quiescenceDetected
+    }
+    
+    enum DrainEffect {
         case releaseLane(Continuation)
-        case wait
-        case detectBlock
+        case suspend(detectingQuiescence: Bool)
         case complete
     }
     
@@ -49,13 +54,26 @@ struct LaneGroupMachine<Continuation> {
         lanes[laneID.index] = .finished
     }
     
-    mutating func nextDrainAction() -> DrainAction {
+    mutating func reduce(_ action: DrainAction) -> DrainEffect? {
+        switch action {
+        case .stalled:
+            nextDrainEffect()
+
+        case .resumed:
+            nil
+
+        case .quiescenceDetected:
+            .releaseLane(releaseNextLane())
+        }
+    }
+    
+    mutating private func nextDrainEffect() -> DrainEffect {
         if lanes.allSatisfy(\.isFinished) {
             return .complete
         }
         
         guard nextLaneIndex < lanes.count else {
-            return .wait
+            return .suspend(detectingQuiescence: false)
         }
         
         let previousState = nextLaneIndex == 0 ? nil : lanes[nextLaneIndex - 1]
@@ -63,13 +81,13 @@ struct LaneGroupMachine<Continuation> {
         case nil, .finished:
             return .releaseLane(releaseNextLane())
         case .active:
-            return .detectBlock
+            return .suspend(detectingQuiescence: true)
         case .pending:
             preconditionFailure("The previous lane must already be released")
         }
     }
     
-    mutating func releaseNextLane() -> Continuation {
+    mutating private func releaseNextLane() -> Continuation {
         guard case .pending(let continuation) = lanes[nextLaneIndex] else {
             preconditionFailure("A lane can only be released once")
         }
