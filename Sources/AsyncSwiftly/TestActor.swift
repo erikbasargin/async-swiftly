@@ -62,11 +62,9 @@ public actor TestActor {
     }
     
     func runOperation(
-        in lane: consuming ReleasedLane,
+        id laneID: LaneID,
         operation: @escaping @Sendable (isolated TestActor) async -> Void,
     ) async {
-        let laneID = lane.id
-        
         defer {
             laneGroup.finish(laneID)
             queue.signal()
@@ -140,15 +138,11 @@ final class Lane: Sendable {
         self.gate = gate
     }
     
-    func waitUntilReleased() async -> ReleasedLane {
+    func waitUntilReleased() async -> LaneID {
         await withTaskCancellationShield {
             var iterator = gate.makeAsyncIterator()
             await iterator.next()
         }
-        return ReleasedLane(id: laneID)
+        return laneID
     }
-}
-
-struct ReleasedLane: ~Copyable, Sendable {
-    fileprivate let id: LaneID
 }

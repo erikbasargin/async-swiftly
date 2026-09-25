@@ -29,8 +29,8 @@ public struct TestTaskGroup: ~Copyable {
             actor.makeLane()
         }
         base.addTask { [testActor] in
-            let lane = await lane.waitUntilReleased()
-            await testActor.runOperation(in: lane, operation: operation)
+            let laneID = await lane.waitUntilReleased()
+            await testActor.runOperation(id: laneID, operation: operation)
         }
     }
 }
