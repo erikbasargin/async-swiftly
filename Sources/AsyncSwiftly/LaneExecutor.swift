@@ -26,6 +26,6 @@ final class LaneExecutor: TaskExecutor, SerialExecutor {
     }
     
     func enqueue(_ job: consuming ExecutorJob) {
-        queue.append(UnownedJob(job), to: laneID)
+        queue.append(QueuedJob(job, taskExecutor: asUnownedTaskExecutor()), to: laneID)
     }
 }

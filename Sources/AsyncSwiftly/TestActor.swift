@@ -18,11 +18,10 @@ public actor TestActor {
     
     nonisolated private let queue = JobPriorityQueue()
     
-    private var executors: [LaneExecutor] = []
     private var laneGroup = LaneGroupMachine<AsyncStream<Never>.Continuation>()
     
     func run(
-        timeout seconds: TimeInterval = 5,
+        timeout seconds: TimeInterval,
         body: @Sendable (isolated TestActor, inout TestTaskGroup) -> Void,
     ) async throws {
         try await withThrowingDiscardingTaskGroup { group in
@@ -58,14 +57,6 @@ public actor TestActor {
         let gate = Lane(laneID: laneID, gate: releaseStream)
         
         queue.appendLane(laneID)
-        let executor = LaneExecutor(
-            laneID: laneID,
-            queue: queue,
-            unownedExecutor: unownedExecutor,
-        )
-        executors.append(executor)
-        
-        assert(laneID.index == executors.count - 1)
         
         return gate
     }
@@ -75,7 +66,6 @@ public actor TestActor {
         operation: @escaping @Sendable (isolated TestActor) async -> Void,
     ) async {
         let laneID = lane.id
-        let executor = executors[laneID.index]
         
         defer {
             laneGroup.finish(laneID)
@@ -86,6 +76,12 @@ public actor TestActor {
             return
         }
         
+        let executor = LaneExecutor(
+            laneID: laneID,
+            queue: queue,
+            unownedExecutor: unownedExecutor,
+        )
+        
         await withTaskExecutorPreference(executor) {
             await operation(self)
         }
@@ -95,11 +91,7 @@ public actor TestActor {
         while true {
             if let (laneID, job) = queue.popFirst() {
                 assert(laneGroup.isReleased(laneID))
-                let executor = executors[laneID.index]
-                job.runSynchronously(
-                    isolatedTo: executor.unownedExecutor,
-                    taskExecutor: executor.asUnownedTaskExecutor(),
-                )
+                job.runSynchronously(isolatedTo: unownedExecutor)
                 continue
             }
             

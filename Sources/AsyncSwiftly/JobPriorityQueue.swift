@@ -16,7 +16,7 @@ import Synchronization
 final class JobPriorityQueue: Sendable {
     
     private let wakeup = AsyncWakeup()
-    private let queue = Mutex(BucketPriorityQueue<UnownedJob>())
+    private let queue = Mutex(BucketPriorityQueue<QueuedJob>())
     
     var isEmpty: Bool {
         queue.withLock(\.isEmpty)
@@ -29,14 +29,14 @@ final class JobPriorityQueue: Sendable {
         }
     }
     
-    func append(_ element: UnownedJob, to laneID: LaneID) {
+    func append(_ element: QueuedJob, to laneID: LaneID) {
         queue.withLock { queue in
             queue.append(element, to: laneID.index)
         }
         wakeup.signal()
     }
     
-    func popFirst() -> (laneID: LaneID, element: UnownedJob)? {
+    func popFirst() -> (laneID: LaneID, element: QueuedJob)? {
         queue.withLock { queue in
             guard let (bucketIndex, element) = queue.popFirst() else {
                 return nil
