@@ -12,3 +12,22 @@
 struct LaneID: Hashable, Sendable {
     let index: Int
 }
+
+struct Lane: Sendable {
+    
+    private let laneID: LaneID
+    private let gate: AsyncStream<Never>
+    
+    init(laneID: LaneID, gate: AsyncStream<Never>) {
+        self.laneID = laneID
+        self.gate = gate
+    }
+    
+    func waitUntilReleased() async -> LaneID {
+        await withTaskCancellationShield {
+            var iterator = gate.makeAsyncIterator()
+            await iterator.next()
+        }
+        return laneID
+    }
+}
