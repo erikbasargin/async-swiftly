@@ -96,3 +96,5 @@ struct LaneGroupMachine<Continuation> {
         return continuation
     }
 }
+
+extension LaneGroupMachine.DrainEffect: Equatable where Continuation: Equatable {}
