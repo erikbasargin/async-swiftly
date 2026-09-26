@@ -81,6 +81,7 @@ public actor TestActor {
         )
         
         await withTaskExecutorPreference(executor) {
+            laneGroupMachine.activate(laneID)
             await operation(self)
         }
     }

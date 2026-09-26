@@ -25,6 +25,7 @@ struct LaneGroupMachine<Continuation> {
     
     private enum LaneState {
         case pending(Continuation)
+        case starting
         case active
         case finished
         
@@ -54,6 +55,10 @@ struct LaneGroupMachine<Continuation> {
         lanes[laneID.index] = .finished
     }
     
+    mutating func activate(_ laneID: LaneID) {
+        lanes[laneID.index] = .active
+    }
+    
     mutating func reduce(_ action: DrainAction) -> DrainEffect? {
         switch action {
         case .stalled:
@@ -80,6 +85,8 @@ struct LaneGroupMachine<Continuation> {
         switch previousState {
         case nil, .finished:
             return .releaseLane(releaseNextLane())
+        case .starting:
+            return .suspend(detectingQuiescence: false)
         case .active:
             return .suspend(detectingQuiescence: true)
         case .pending:
@@ -91,7 +98,7 @@ struct LaneGroupMachine<Continuation> {
         guard case .pending(let continuation) = lanes[nextLaneIndex] else {
             preconditionFailure("A lane can only be released once")
         }
-        lanes[nextLaneIndex] = .active
+        lanes[nextLaneIndex] = .starting
         nextLaneIndex += 1
         return continuation
     }
