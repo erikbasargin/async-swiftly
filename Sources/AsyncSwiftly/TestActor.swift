@@ -103,36 +103,16 @@ public actor TestActor {
                     effect = nil
 
                 case .suspend(let detectingQuiescence):
-                    let action = await waitForResume(detectingQuiescence)
-                    effect = laneGroupMachine.reduce(action)
+                    effect = switch await queue.wait(detectingQuiescence: detectingQuiescence) {
+                    case .activityDetected:
+                        laneGroupMachine.reduce(.resumed)
+                    case .quiescenceDetected:
+                        laneGroupMachine.reduce(.quiescenceDetected)
+                    }
 
                 case .complete:
                     return
                 }
-            }
-        }
-    }
-    
-    private func waitForResume(_ detectingQuiescence: Bool) async -> StateMachine.DrainAction {
-        await withTaskCancellationShield {
-            await withTaskGroup { [queue] group in
-                group.addTask {
-                    await queue.wait()
-                    return StateMachine.DrainAction.resumed
-                }
-                if detectingQuiescence {
-                    group.addTask {
-                        for _ in 0..<1000 {
-                            if Task.isCancelled { return .resumed }
-                            await Task.yield()
-                        }
-                        return .quiescenceDetected
-                    }
-                }
-                
-                let result = await group.next()!
-                group.cancelAll()
-                return result
             }
         }
     }
