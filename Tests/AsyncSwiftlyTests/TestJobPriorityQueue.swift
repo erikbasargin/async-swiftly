@@ -17,14 +17,14 @@ struct TestJobPriorityQueue {
     
     @Test func `Cancelled caller still detects quiescence`() async throws {
         let queue = JobPriorityQueue()
-
+        
         let result = try await Task {
             try withUnsafeCurrentTask { currentTask in
                 try #require(currentTask).cancel()
             }
             return await queue.wait(detectingQuiescence: true)
         }.value
-
+        
         #expect(result == .quiescenceDetected)
     }
 }
