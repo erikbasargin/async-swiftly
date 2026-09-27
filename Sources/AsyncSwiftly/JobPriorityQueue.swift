@@ -70,7 +70,7 @@ final class JobPriorityQueue: Sendable {
     
     func wait(detectingQuiescence: Bool) async -> WaitResult {
         await withTaskCancellationShield {
-            await withTaskGroup { [detector] group in
+            await withTaskGroup { group in
                 group.addTask {
                     _ = await self.wakeup.wait()
                     return JobPriorityQueue.WaitResult.activityDetected
@@ -78,8 +78,8 @@ final class JobPriorityQueue: Sendable {
                 if detectingQuiescence {
                     group.addTask {
                         do {
-                            try await detector.waitForExpiry()
-                            return .quiescenceDetected
+                            try await self.detector.waitForExpiry()
+                            return self.queue.withLock(\.isEmpty) ? .quiescenceDetected : .activityDetected
                         } catch {
                             return .activityDetected
                         }
