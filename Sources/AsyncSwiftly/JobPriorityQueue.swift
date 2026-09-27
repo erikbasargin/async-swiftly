@@ -51,24 +51,26 @@ final class JobPriorityQueue: Sendable {
     }
     
     func wait(detectingQuiescence: Bool) async -> WaitResult {
-        await withTaskGroup { group in
-            group.addTask {
-                _ = await self.wakeup.wait()
-                return JobPriorityQueue.WaitResult.activityDetected
-            }
-            if detectingQuiescence {
+        await withTaskCancellationShield {
+            await withTaskGroup { group in
                 group.addTask {
-                    for _ in 0..<1000 {
-                        if Task.isCancelled { return .activityDetected }
-                        await Task.yield()
-                    }
-                    return .quiescenceDetected
+                    _ = await self.wakeup.wait()
+                    return JobPriorityQueue.WaitResult.activityDetected
                 }
+                if detectingQuiescence {
+                    group.addTask {
+                        for _ in 0..<1000 {
+                            if Task.isCancelled { return .activityDetected }
+                            await Task.yield()
+                        }
+                        return .quiescenceDetected
+                    }
+                }
+                
+                let result = await group.next()!
+                group.cancelAll()
+                return result
             }
-            
-            let result = await group.next()!
-            group.cancelAll()
-            return result
         }
     }
     
