@@ -13,6 +13,19 @@ import AsyncWakeup
 import BucketPriorityQueue
 import Synchronization
 
+protocol QuiescenceDetector: Sendable {
+    func waitForExpiry() async throws
+}
+
+struct YieldQuiescenceDetector: QuiescenceDetector {
+    func waitForExpiry() async throws {
+        for _ in 0..<1000 {
+            try Task.checkCancellation()
+            await Task.yield()
+        }
+    }
+}
+
 final class JobPriorityQueue: Sendable {
     
     enum WaitResult: Sendable {
@@ -20,8 +33,13 @@ final class JobPriorityQueue: Sendable {
         case quiescenceDetected
     }
     
+    private let detector: any QuiescenceDetector
     private let wakeup = AsyncWakeup()
     private let queue = Mutex(BucketPriorityQueue<QueuedJob>())
+    
+    init(detector: any QuiescenceDetector = YieldQuiescenceDetector()) {
+        self.detector = detector
+    }
     
     var isEmpty: Bool {
         queue.withLock(\.isEmpty)
@@ -52,18 +70,19 @@ final class JobPriorityQueue: Sendable {
     
     func wait(detectingQuiescence: Bool) async -> WaitResult {
         await withTaskCancellationShield {
-            await withTaskGroup { group in
+            await withTaskGroup { [detector] group in
                 group.addTask {
                     _ = await self.wakeup.wait()
                     return JobPriorityQueue.WaitResult.activityDetected
                 }
                 if detectingQuiescence {
                     group.addTask {
-                        for _ in 0..<1000 {
-                            if Task.isCancelled { return .activityDetected }
-                            await Task.yield()
+                        do {
+                            try await detector.waitForExpiry()
+                            return .quiescenceDetected
+                        } catch {
+                            return .activityDetected
                         }
-                        return .quiescenceDetected
                     }
                 }
                 
