@@ -103,12 +103,13 @@ public actor TestActor {
                     effect = nil
 
                 case .suspend(let detectingQuiescence):
-                    effect = switch await queue.wait(detectingQuiescence: detectingQuiescence) {
-                    case .activityDetected:
-                        laneGroupMachine.reduce(.resumed)
-                    case .quiescenceDetected:
-                        laneGroupMachine.reduce(.quiescenceDetected)
-                    }
+                    effect =
+                        switch await queue.wait(detectingQuiescence: detectingQuiescence) {
+                        case .activityDetected:
+                            laneGroupMachine.reduce(.resumed)
+                        case .quiescenceDetected:
+                            laneGroupMachine.reduce(.quiescenceDetected)
+                        }
 
                 case .complete:
                     return
