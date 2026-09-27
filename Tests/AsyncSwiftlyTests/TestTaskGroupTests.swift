@@ -32,7 +32,10 @@ struct TestTaskGroupTests {
     @Test func `Operations are skipped if scope is cancelled`() async throws {
         let events = Events<Int>()
         let task = Task {
-            withUnsafeCurrentTask { $0?.cancel() }
+            try withUnsafeCurrentTask { currentTask in
+                try #require(currentTask).cancel()
+            }
+            
             try await withTestTaskGroup { _, group in
                 for id in 0..<10 {
                     group.addTask { _ in
