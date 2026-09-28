@@ -54,6 +54,37 @@ jobs:
           disable_search: true
           fail_ci_if_error: true
 
+  stress_testing:
+    name: Stress Testing
+    runs-on: xcode-27
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Show Apple toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk macosx --show-sdk-version
+
+      - name: Install xcbeautify
+        run: brew install xcbeautify
+
+      - name: Build and test
+        shell: bash
+        run: |
+          set -o pipefail
+          NSUnbufferedIO=YES bash scripts/stress.sh 2>&1 | xcbeautify --renderer github-actions
+
+      - name: Upload failed stress test results
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: stress-xcresult
+          path: .build/stress/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
+
   linux_checks:
     name: Linux Checks
     uses: swiftlang/github-workflows/.github/workflows/swift_package_test.yml@0.0.15
