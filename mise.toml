@@ -7,3 +7,7 @@ run = [
     "swiftly run swift format . --recursive --in-place",
     "swiftly run swift format lint . --recursive --strict",
 ]
+
+[tasks.stress]
+description = "Run stress-tagged tests with Xcode (macOS only)"
+run = "bash scripts/stress.sh"
