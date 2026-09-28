@@ -135,7 +135,7 @@ struct TestTaskGroupTests {
         #expect(events.values == ["cleanup"])
     }
     
-    @Test func `Suspended operation does not block later operations`() async throws {
+    @Test(.tags(.stress)) func `Suspended operation does not block later operations`() async throws {
         let events = Events<Int>()
         let dependency = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(0))
         defer {
