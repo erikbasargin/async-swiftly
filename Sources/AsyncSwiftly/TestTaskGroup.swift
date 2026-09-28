@@ -24,7 +24,7 @@ public struct TestTaskGroup: ~Copyable {
     let testActor: TestActor
     var base: ThrowingDiscardingTaskGroup<any Error>
     
-    package mutating func addTask(operation: @escaping @Sendable (isolated TestActor) async -> Void) {
+    public mutating func addTask(operation: @escaping @Sendable (isolated TestActor) async -> Void) {
         let lane = testActor.assumeIsolated { actor in
             actor.makeLane()
         }
