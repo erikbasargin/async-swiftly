@@ -35,6 +35,7 @@ struct TestBucketPriorityQueue {
         #expect(queue.buckets[bucketIndex] == [42])
     }
     
+    #if os(macOS) || os(Linux)
     @Test(arguments: [-1, 1]) func `Process exits with failure when append is called with an invalid bucket index`(
         invalidBucketIndex: Int
     ) async throws {
@@ -45,6 +46,7 @@ struct TestBucketPriorityQueue {
             queue.append(42, to: invalidBucketIndex)
         }
     }
+    #endif
     
     @Test func `popFirst returns bucket and its first element given queue with one element`() throws {
         var queue = BucketPriorityQueue<Int>()

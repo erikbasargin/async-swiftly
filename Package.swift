@@ -13,7 +13,8 @@ var defaultSwiftSettings: [SwiftSetting] {
 let package = Package(
     name: "async-swiftly",
     platforms: [
-        .macOS(.v27)
+        .macOS(.v27),
+        .iOS(.v27),
     ],
     products: [
         .library(
@@ -49,7 +50,11 @@ let package = Package(
             name: "AsyncSwiftlyTests",
             dependencies: [
                 "AsyncSwiftly",
-                .product(name: "Subprocess", package: "swift-subprocess"),
+                .product(
+                    name: "Subprocess",
+                    package: "swift-subprocess",
+                    condition: .when(platforms: [.macOS, .linux]),
+                ),
             ],
             resources: [.copy("Fixtures")],
             swiftSettings: defaultSwiftSettings,

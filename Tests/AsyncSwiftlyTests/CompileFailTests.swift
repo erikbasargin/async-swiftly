@@ -9,6 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(Subprocess)
 import Foundation
 import Subprocess
 import Testing
@@ -45,3 +46,4 @@ struct CompileFailTests {
         #expect(result.terminationStatus.isSuccess, "\(result.standardError)")
     }
 }
+#endif
