@@ -54,6 +54,52 @@ jobs:
           disable_search: true
           fail_ci_if_error: true
 
+  simulator_checks:
+    name: ${{ matrix.platform }} Checks
+    runs-on: xcode-27
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: iOS
+            destination: 'platform=iOS Simulator,name=iPhone 17,OS=27.0'
+          - platform: watchOS
+            destination: 'platform=watchOS Simulator,name=Apple Watch SE 3 (40mm),OS=27.0'
+          - platform: tvOS
+            destination: 'platform=tvOS Simulator,name=Apple TV 4K (3rd generation),OS=27.0'
+          - platform: visionOS
+            destination: 'platform=visionOS Simulator,name=Apple Vision Pro,OS=27.0'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Show Apple toolchain
+        run: |
+          xcodebuild -version
+          xcrun swift --version
+          xcrun simctl list devices available
+
+      - name: Build and test
+        env:
+          DESTINATION: ${{ matrix.destination }}
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -scheme async-swiftly \
+            -destination "$DESTINATION" \
+            -resultBundlePath "$RUNNER_TEMP/simulator-results.xcresult" \
+            2>&1 | xcbeautify --renderer github-actions
+
+      - name: Upload failed simulator test results
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: simulator-${{ matrix.platform }}-xcresult
+          path: ${{ runner.temp }}/simulator-results.xcresult
+          if-no-files-found: ignore
+          retention-days: 7
+
   stress_testing:
     name: Stress Testing
     runs-on: xcode-27
