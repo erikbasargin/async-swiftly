@@ -24,11 +24,14 @@ public struct TestTaskGroup: ~Copyable {
     let testActor: TestActor
     var base: ThrowingDiscardingTaskGroup<any Error>
     
-    public mutating func addTask(operation: @escaping @Sendable (isolated TestActor) async -> Void) {
+    public mutating func addTask(
+        name: String? = nil,
+        operation: @escaping @Sendable (isolated TestActor) async -> Void,
+    ) {
         let lane = testActor.assumeIsolated { actor in
             actor.makeLane()
         }
-        base.addTask { [testActor] in
+        base.addTask(name: name) { [testActor] in
             let laneID = await lane.waitUntilReleased()
             await testActor.runOperation(id: laneID, operation: operation)
         }
