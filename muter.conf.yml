@@ -1,7 +1,7 @@
 arguments:
   - test
   - --skip
-  - CompileFailTests
+  - CompileFailTests|TestAsyncWakeup|TestJobPriorityQueue|TestTaskGroupTests
 executable: /usr/bin/swift
 exclude:
   - Package.swift

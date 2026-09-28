@@ -64,8 +64,8 @@ jobs:
     name: Run mutation tests
     needs: request
     if: needs.request.outputs.sha != ''
-    runs-on: macos-26
-    timeout-minutes: 90
+    runs-on: xcode-27
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
@@ -76,31 +76,20 @@ jobs:
           ref: ${{ needs.request.outputs.sha }}
           persist-credentials: false
 
-      - name: Show Apple toolchain
-        run: |
-          xcodebuild -version
-          xcrun --sdk macosx --show-sdk-version
+      - name: Install Muter
+        run: brew install muter-mutation-testing/formulae/muter
 
-      - name: Install Muter, Swiftly, and mise
-        run: brew install muter-mutation-testing/formulae/muter swiftly mise
-
-      - name: Install the pinned Swift toolchain
-        run: |
-          swiftly init --skip-install --no-modify-profile --assume-yes
-          . "$HOME/.swiftly/env.sh"
-          swiftly install --assume-yes
-          swiftly run swift --version
-          echo "$SWIFTLY_BIN_DIR" >> "$GITHUB_PATH"
+      - name: Build for mutation testing
+        run: swift build --build-tests
 
       - name: Run Muter
-        timeout-minutes: 60
+        timeout-minutes: 10
         env:
           REPORT_DIR: ${{ runner.temp }}/muter-results
-          MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
         run: |
           mkdir -p "$REPORT_DIR"
           set -o pipefail
-          mise run muter -- --format plain \
+          muter run --skip-update-check --format plain \
             --output "$REPORT_DIR/muter-report.txt" 2>&1 | tee "$REPORT_DIR/muter.log"
           test -s "$REPORT_DIR/muter-report.txt"
 
