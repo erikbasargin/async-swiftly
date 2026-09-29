@@ -166,6 +166,63 @@ struct TestTaskGroupTests {
         }
         #expect(reference.value == nil)
     }
+    
+    @Test func `Nested group releases a later lane to unblock an earlier operation`() async throws {
+        let events = Events<Int>()
+        let dependency = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(0))
+        defer { dependency.continuation.finish() }
+        
+        try await withTestTaskGroup(timeout: 5) { _, outer in
+            outer.addTask { outerActor in
+                do {
+                    try await withTestTaskGroup(timeout: 2) { innerActor, inner in
+                        #expect(innerActor !== outerActor)
+                        inner.addTask { _ in
+                            await Task.yield()
+                            events.append(0)
+                            await dependency.stream.first(where: { _ in true })
+                            events.append(2)
+                        }
+                        inner.addTask { _ in
+                            events.append(1)
+                            dependency.continuation.yield()
+                        }
+                    }
+                } catch {
+                    Issue.record(error)
+                }
+            }
+        }
+        
+        #expect(events.values == [0, 1, 2])
+    }
+    
+    @Test func `Nested group timeout cancels and drains operation cleanup`() async throws {
+        let events = Events<String>()
+        
+        try await withTestTaskGroup(timeout: 5) { _, outer in
+            outer.addTask { _ in
+                await #expect(throws: TestActor.TimeoutError.self) {
+                    try await withTestTaskGroup(timeout: 0.05) { _, inner in
+                        inner.addTask { _ in
+                            do {
+                                try await Task.sleep(for: .seconds(60))
+                                Issue.record("Sleep should have been cancelled")
+                            } catch is CancellationError {
+                                await Task.yield()
+                                events.append("cleanup")
+                            } catch {
+                                Issue.record(error)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        #expect(events.values == ["cleanup"])
+    }
+    
 }
 
 private final class Events<Value: Sendable>: Sendable {
