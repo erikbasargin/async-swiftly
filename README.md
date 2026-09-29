@@ -1,5 +1,7 @@
 # async-swiftly
 
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Ferikbasargin%2Fasync-swiftly%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/erikbasargin/async-swiftly)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Ferikbasargin%2Fasync-swiftly%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/erikbasargin/async-swiftly)
 [![CI](https://github.com/erikbasargin/async-swiftly/actions/workflows/ci.yml/badge.svg)](https://github.com/erikbasargin/async-swiftly/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/github/erikbasargin/async-swiftly/graph/badge.svg?token=N8PSU6TVV7)](https://codecov.io/github/erikbasargin/async-swiftly)
 [![License](https://img.shields.io/github/license/erikbasargin/async-swiftly.svg)](LICENSE)
