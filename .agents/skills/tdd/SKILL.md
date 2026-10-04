@@ -48,11 +48,11 @@ Present:
 - Commands and executed, passed, failed, skipped, and not-run counts.
 - Deferred inventory items.
 
-Stop for review. Feedback keeps the workflow at red until the developer approves it. Approval authorizes committing red and beginning green.
+Stop for review. Feedback keeps the workflow at red until the developer approves it. Approval authorizes staging the approved red changes and beginning green; do not create a commit.
 
 ## 4. Reach Reviewed Green
 
-First commit the approved red state.
+First stage only the approved red changes. Keep green changes unstaged while implementing and reviewing them so the staged diff preserves the approved red checkpoint. Preserve unrelated staged and unstaged work.
 
 Before implementation, state the minimum contract: the path required by the current test, guards or branches already covered, and adjacent cases that must remain neutral or deferred.
 
@@ -62,11 +62,11 @@ Format changed files, run focused tests for feedback, then run the project's ent
 
 Inspect every new branch, boundary, transformation, and special case. Report which parts were forced by the test and flag accidental or premature behavior.
 
-Stop for review. Approval authorizes committing green, squashing red and green into one behavior commit, and beginning refactor analysis. Do not begin another test.
+Stop for review. Approval authorizes staging the approved green changes, creating one behavior commit containing the test and implementation, and beginning refactor analysis. Do not begin another test.
 
 ## 5. Complete the Refactor Checkpoint
 
-After green approval, commit green and squash the red and green commits into one behavior commit.
+After green approval, stage the approved green changes and create one behavior commit containing the approved red and green changes. Exclude unrelated work from the commit.
 
 Inspect the changed production and test code for unclear names, duplication, unnecessary branches or state, misplaced responsibilities, nearby duplicate coverage, and invariants better expressed by types.
 
