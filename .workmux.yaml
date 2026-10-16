@@ -1,6 +1,6 @@
-nerdfont: true # Enable nerdfont icons
-merge_strategy: rebase # Make workmux merge do rebase by default
-merge_keep: true # Keep worktree, window, and branch after merge by default
+nerdfont: true  # Enable nerdfont icons
+merge_strategy: rebase  # Make workmux merge do rebase by default
+merge_keep: true  # Keep worktree, window, and branch after merge by default
 confirm_unmerged_removal: true
 agent: codex
 window_prefix: "async-"
@@ -8,12 +8,9 @@ window_prefix: "async-"
 panes:
   - command: nvim .
     focus: true
-
   - command: <agent>
     split: horizontal
     percentage: 35
-
-  - split: vertical 
+  - split: vertical
     target: 0
     size: 12
-

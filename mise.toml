@@ -12,10 +12,19 @@ dir = "{{config_root}}"
 run = "muter run --skip-update-check"
 
 [tasks.lint]
+description = "Run all linters"
+depends = ["lint:swift", "lint:yaml"]
+
+[tasks."lint:swift"]
+dir = "{{config_root}}"
 run = [
     "swiftly run swift format . --recursive --in-place",
     "swiftly run swift format lint . --recursive --strict",
 ]
+
+[tasks."lint:yaml"]
+dir = "{{config_root}}"
+run = "yamllint --strict --config-file .yamllint.yml ."
 
 [tasks.stress]
 description = "Run stress-tagged tests with Xcode (macOS only)"
