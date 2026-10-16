@@ -1,5 +1,14 @@
+[tasks.build]
+dir = "{{config_root}}"
+run = "swiftly run swift build"
+
+[tasks.test]
+dir = "{{config_root}}"
+run = "swiftly run swift test"
+
 [tasks.muter]
 description = "Run Muter"
+dir = "{{config_root}}"
 run = "muter run --skip-update-check"
 
 [tasks.lint]
@@ -10,4 +19,5 @@ run = [
 
 [tasks.stress]
 description = "Run stress-tagged tests with Xcode (macOS only)"
+dir = "{{config_root}}"
 run = "bash scripts/stress.sh"
