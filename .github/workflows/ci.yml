@@ -20,6 +20,8 @@ jobs:
   macos_checks:
     name: macOS Checks
     runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -57,6 +59,8 @@ jobs:
   simulator_checks:
     name: ${{ matrix.platform }} Checks
     runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -103,6 +107,8 @@ jobs:
   stress_testing:
     name: Stress Testing
     runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
