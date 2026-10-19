@@ -84,10 +84,14 @@ jobs:
           xcrun swift --version
           xcrun simctl list devices available
 
-      - name: Boot watchOS simulator
-        if: matrix.platform == 'watchOS'
+      - name: Boot simulator
         timeout-minutes: 5
-        run: xcrun simctl bootstatus 'Apple Watch SE 3 (40mm)' -b
+        env:
+          DESTINATION: ${{ matrix.destination }}
+        run: |
+          simulator="${DESTINATION#*,name=}"
+          simulator="${simulator%%,*}"
+          xcrun simctl bootstatus "$simulator" -b
 
       - name: Build and test
         env:
