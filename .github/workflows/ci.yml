@@ -84,6 +84,11 @@ jobs:
           xcrun swift --version
           xcrun simctl list devices available
 
+      - name: Boot watchOS simulator
+        if: matrix.platform == 'watchOS'
+        timeout-minutes: 5
+        run: xcrun simctl bootstatus 'Apple Watch SE 3 (40mm)' -b
+
       - name: Build and test
         env:
           DESTINATION: ${{ matrix.destination }}
@@ -93,14 +98,16 @@ jobs:
             -scheme async-swiftly \
             -destination "$DESTINATION" \
             -resultBundlePath "$RUNNER_TEMP/simulator-results.xcresult" \
-            2>&1 | xcbeautify --renderer github-actions
+            2>&1 | tee "$RUNNER_TEMP/simulator-xcodebuild.log" | xcbeautify --renderer github-actions
 
       - name: Upload failed simulator test results
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
         with:
           name: simulator-${{ matrix.platform }}-xcresult
-          path: ${{ runner.temp }}/simulator-results.xcresult
+          path: |
+            ${{ runner.temp }}/simulator-results.xcresult
+            ${{ runner.temp }}/simulator-xcodebuild.log
           if-no-files-found: ignore
           retention-days: 7
 
