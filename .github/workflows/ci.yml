@@ -69,7 +69,7 @@ jobs:
           - platform: iOS
             destination: 'platform=iOS Simulator,name=iPhone 17,OS=27.0'
           - platform: watchOS
-            destination: 'platform=watchOS Simulator,name=Apple Watch SE 3 (40mm),OS=27.0'
+            destination: 'platform=watchOS Simulator,name=Apple Watch SE 3 (40mm)'
           - platform: tvOS
             destination: 'platform=tvOS Simulator,name=Apple TV 4K (3rd generation),OS=27.0'
           - platform: visionOS
